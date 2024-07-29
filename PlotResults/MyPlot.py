@@ -24,27 +24,33 @@ class MyPlot(object):
     def show_config(self):
         print( f" Number Scenario {self.number_scenarios}")
         print( f" Base Directory {self.base_directory}")
+   
+
+
+
+
     def plot(self):
-        plt.xlim(0, 20000)
-        plt.ylim(0, self.number_scenarios)
+        x_max= 50**10
+        plt.xlim(0, x_max)
+        plt.ylim(0, self.number_scenarios+1)
         plt.grid(True, linestyle='--', color='gray', alpha=0.5)   
         plt.axhline(y=0, color='k', linewidth=1)
         plt.axvline(x=0, color='k', linewidth=1)
-        start_moment = self.df_vec[0].iloc[0,2]
+        
 
         max= 0
         for i in range(len(self.df_vec)):
+         start_moment = self.df_vec[i].iloc[0,2]
          print( f" Ploting process {i} ...")
          tdiff = 0 
          for k in range(len(self.df_vec[i])):
           diff= self.df_vec[i].iloc[k,3] - self.df_vec[i].iloc[k,2]
           tdiff= tdiff + diff
-          x1 = ( self.df_vec[i].iloc[k,2] - start_moment ) 
-          x2 = ( self.df_vec[i].iloc[k,3] - start_moment )   
+          x1 = ( self.df_vec[i].iloc[k,2] - start_moment ) **10 
+          x2 = ( self.df_vec[i].iloc[k,3] - start_moment ) **10
+          plt.plot([x1,x2],[i+1,i+1], color=self.random_color(), linestyle='-')
           if x2 > max:
-              max = x2
-          plt.scatter(x1,i, color=self.random_color())    
-          plt.scatter(x1,2, color=self.random_color())    
+              max = x2          
          print(f"Total diff {i} {tdiff} {max}...")        
         plt.show()
 
