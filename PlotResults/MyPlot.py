@@ -15,7 +15,7 @@ class MyPlot(object):
 
     def random_color(self,k):
         if (k >= len(self.colors) ):
-            self.colors= '#{:06x}'.format(random.randint(0, 0xFFFFFF))
+            self.colors.append( '#{:06x}'.format(random.randint(0, 0xFFFFFF)))
         return self.colors[k]
 
     def load_data(self):
@@ -42,14 +42,15 @@ class MyPlot(object):
         plt.axhline(y=0, color='k', linewidth=1)
         plt.axvline(x=0, color='k', linewidth=1)
         small_length=0
-        scale = 1
+        scale = 1 * 10**6
         
 
         max= 0
-        for i in range(self.number_scenarios):
-         start_moment = self.df_vec[i].iloc[0,2]
+        
+        for i in range(self.number_scenarios):         
          print( f" Ploting process {i} ...")
          tdiff = 0 
+         start_moment= self.df_vec[i].iloc[0,2] 
          if self.max_lines > 0:
              max_lines=self.max_lines
          else:
@@ -59,7 +60,7 @@ class MyPlot(object):
           x2 = ( self.df_vec[i].iloc[k,3] - start_moment )* scale
           diff= x2 - x1
           tdiff= tdiff + diff
-          plt.plot([x1,x2+small_length],[i+1,i+1], color=self.random_color(k),marker='o',markersize=1)
+          plt.plot([x1,x2+small_length],[i+1,i+1], color=self.random_color(k),marker='o',markersize=1 * scale)
           if x2 > max:
               max = x2          
          print(f"Total diff {i} {tdiff} {max}...")   
