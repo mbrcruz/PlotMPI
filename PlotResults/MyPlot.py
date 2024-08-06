@@ -37,6 +37,8 @@ class MyPlot(object):
         plt.ylim(0, self.number_scenarios+1)
         #plt.xscale('log')
         #plt.yscale('linear')
+        plt.xlabel('Time in microseconds(ms)')
+        plt.ylabel('Core Id')
 
         plt.grid(True, linestyle='--', color='gray', alpha=0.5)   
         plt.axhline(y=0, color='k', linewidth=1)
@@ -57,14 +59,14 @@ class MyPlot(object):
             max_lines = len(self.df_vec[i])
          for k in range(max_lines):          
           x1 = ( self.df_vec[i].iloc[k,2] - start_moment ) * scale
-          x2 = ( self.df_vec[i].iloc[k,3] - start_moment )* scale
+          x2 = ( self.df_vec[i].iloc[k,3] - start_moment ) * scale
           diff= x2 - x1
           tdiff= tdiff + diff
-          plt.plot([x1,x2+small_length],[i+1,i+1], color=self.random_color(k),marker='o',markersize=1 * scale)
+          plt.plot([x1,x2+small_length],[i+1,i+1], color=self.random_color(k),marker='o',markersize=1)
           if x2 > max:
               max = x2          
          print(f"Total diff {i} {tdiff} {max}...")   
-        plt.xlim(0, max *scale) 
+        plt.xlim(0, max) 
         plt.show()
 
    
