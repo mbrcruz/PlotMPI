@@ -8,10 +8,10 @@ class MyPlot(object):
     """description of class"""
 
 
-    def __init__(self, base_directory,number_scenarios,max_lines):
+    def __init__(self, base_directory,number_scenarios,limit):
         self.number_scenarios = number_scenarios
         self.base_directory = base_directory
-        self.max_lines=max_lines
+        self.limit=limit
         self.df_vec= []
         self.df_master= []
         self.colors={}
@@ -87,20 +87,23 @@ class MyPlot(object):
 
 
 
-    def plot(self):        
-               
+    def plot(self):     
+        
+        small_length=0.1
+        scale = 10**6            
         plt.ylim(0, self.number_scenarios+1)
         #plt.xscale('log')
         #plt.yscale('linear')
-        plt.xlim(0, 3600)
+        if self.limit==0:
+            self.limit=3000
+        plt.xlim(0, self.limit*scale)
         plt.xlabel('Time in microseconds(ms)')
         plt.ylabel('Core Id')
 
         plt.grid(True, linestyle='--', color='gray', alpha=0.5)   
         plt.axhline(y=0, color='k', linewidth=0.1)
         plt.axvline(x=0, color='k', linewidth=0.1)
-        small_length=0.1
-        scale = 1
+       
         
 
         max= 0
@@ -117,12 +120,15 @@ class MyPlot(object):
          last_x1=0
          for file in self.X1[i].keys():    
              for block in self.X1[i][file].keys():               
-                x1 = ( self.X1[scenario][file][block] - self.start_moment ) * scale
-                x2 = ( self.X2[scenario][file][block] - self.start_moment ) * scale
+                x1 = ( self.X1[scenario][file][block] - self.start_moment ) 
+                x2 = ( self.X2[scenario][file][block] - self.start_moment )
                 diff= x2 - x1
                 self.diffs.append(diff)                
-                #plt.plot([x1,x2+small_length],[scenario+1,scenario+1], color=self.random_color(file))
-                plt.scatter(x1,scenario+1, color=self.random_color(file),s=0.1)             
+                
+                if x1 < self.limit:
+                    plt.plot([x1*scale,x2*scale],[scenario+1,scenario+1], color=self.random_color(file),marker="o",markersize=1)
+                    #plt.plot([x1*scale,x2*scale],[scenario+1,scenario+1], color=self.random_color(file),linewidth=1)
+                    #plt.scatter(x1*scale,scenario+1, color=self.random_color(file),s=1)             
            
         avg_time= statistics.mean(self.diffs)        
         stdev_time = statistics.stdev(self.diffs)
