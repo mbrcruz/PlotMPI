@@ -2,6 +2,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import os
 import random
+import statistics
+
 class MyPlot(object):
     """description of class"""
 
@@ -11,18 +13,71 @@ class MyPlot(object):
         self.base_directory = base_directory
         self.max_lines=max_lines
         self.df_vec= []
-        self.colors=[]
+        self.df_master= []
+        self.colors={}
+        self.X1=[]
+        self.X2=[]
+        self.diffs=[]
+        self.start_moment=1000000000000000
 
     def random_color(self,k):
-        if (k >= len(self.colors) ):
-            self.colors.append( '#{:06x}'.format(random.randint(0, 0xFFFFFF)))
+        if k not in self.colors:
+            self.colors[k]='#{:06x}'.format(random.randint(0, 0xFFFFFF))            
         return self.colors[k]
 
     def load_data(self):
         start = 2
         for i in range(self.number_scenarios):
+            print(f'Loading scenario {i+1}')
             sufix= start +i
-            self.df_vec.append(pd.read_csv(os.path.join(self.base_directory ,f"mpiio-{sufix}.log")))
+            self.X1.append(dict())
+            self.X2.append(dict())            
+            df= pd.read_csv(os.path.join(self.base_directory ,f"mpiio-{sufix}.log"),header=None)
+            
+            if ( self.start_moment > df.iloc[0,4] ):
+                self.start_moment= df.iloc[0,4]
+           
+            for k in range(len(df)):
+                scenario = i 
+                file = df.iloc[k,2]
+                block = df.iloc[k,3] 
+                time = df.iloc[k,4]
+                if file in self.X1[scenario]:
+                    if block in self.X1[i][file] and self.X1[scenario][file][block] < time:
+                        continue
+                    else: 
+                        self.X1[scenario][file][block]= time                                                        
+                else:
+                    self.X1[scenario][file]={}
+                    self.X1[scenario][file][block]=time
+                    
+        self.df_master=pd.read_csv(os.path.join(self.base_directory ,f"mpiio-master.log"),header=None)
+
+        for k in range(len(self.df_master)):
+            scenario = self.df_master.iloc[k,0]-1
+            file = self.df_master.iloc[k,1]
+            block= self.df_master.iloc[k,2]
+            time = self.df_master.iloc[k,4] 
+            if scenario < self.number_scenarios:
+                try:
+                    if self.X1[scenario][file][block]:
+                        if file in self.X2[scenario]:
+                            if block in self.X2[scenario][file] and self.X2[scenario][file][block] > time:
+                                continue
+                            else: 
+                                self.X2[scenario][file][block]=  time                                                       
+                        else:
+                            self.X2[scenario][file]={}
+                            self.X2[scenario][file][block]= time
+                except KeyError:
+                    continue
+
+           
+
+                    
+        
+             
+             
 
     def show_config(self):
         print( f" Number Scenario {self.number_scenarios}")
@@ -37,36 +92,47 @@ class MyPlot(object):
         plt.ylim(0, self.number_scenarios+1)
         #plt.xscale('log')
         #plt.yscale('linear')
+        plt.xlim(0, 3600)
         plt.xlabel('Time in microseconds(ms)')
         plt.ylabel('Core Id')
 
         plt.grid(True, linestyle='--', color='gray', alpha=0.5)   
-        plt.axhline(y=0, color='k', linewidth=1)
-        plt.axvline(x=0, color='k', linewidth=1)
-        small_length=0
-        scale = 1 * 10**6
+        plt.axhline(y=0, color='k', linewidth=0.1)
+        plt.axvline(x=0, color='k', linewidth=0.1)
+        small_length=0.1
+        scale = 1
         
 
         max= 0
-        
+        self.start_moment = self.start_moment -  60
         for i in range(self.number_scenarios):         
-         print( f" Ploting process {i} ...")
+         print( f"Ploting scenario {i+1} ...")
          tdiff = 0 
-         start_moment= self.df_vec[i].iloc[0,2] 
-         if self.max_lines > 0:
-             max_lines=self.max_lines
-         else:
-            max_lines = len(self.df_vec[i])
-         for k in range(max_lines):          
-          x1 = ( self.df_vec[i].iloc[k,2] - start_moment ) * scale
-          x2 = ( self.df_vec[i].iloc[k,3] - start_moment ) * scale
-          diff= x2 - x1
-          tdiff= tdiff + diff
-          plt.plot([x1,x2+small_length],[i+1,i+1], color=self.random_color(k),marker='o',markersize=1)
-          if x2 > max:
-              max = x2          
-         print(f"Total diff {i} {tdiff} {max}...")   
-        plt.xlim(0, max) 
+         scenario = i         
+         #start_moment= self.df_vec[i].iloc[0,4] 
+         #if self.max_lines > 0:
+         #    max_lines=self.max_lines
+         #else:
+         #   max_lines = len(self.df_vec[i])
+         last_x1=0
+         for file in self.X1[i].keys():    
+             for block in self.X1[i][file].keys():               
+                x1 = ( self.X1[scenario][file][block] - self.start_moment ) * scale
+                x2 = ( self.X2[scenario][file][block] - self.start_moment ) * scale
+                diff= x2 - x1
+                self.diffs.append(diff)                
+                #plt.plot([x1,x2+small_length],[scenario+1,scenario+1], color=self.random_color(file))
+                plt.scatter(x1,scenario+1, color=self.random_color(file),s=0.1)             
+           
+        avg_time= statistics.mean(self.diffs)        
+        stdev_time = statistics.stdev(self.diffs)
+        sum_time= sum(self.diffs)
+        count_time= len(self.diffs)
+        print(f'Sum {count_time}')         
+        print(f'Mean {avg_time}')        
+        print(f'Stdev {stdev_time}')  
+        print(f'Sum {sum_time}')   
+        #plt.xlim(0, max) 
         plt.show()
 
    
