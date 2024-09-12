@@ -126,10 +126,9 @@ class MyPlot(object):
                 self.diffs.append(diff)                
                 
                 if x1 < self.limit:
-                    plt.plot([x1*scale,x2*scale],[scenario+1,scenario+1], color=self.random_color(file),marker="o",markersize=1)
+                    plt.scatter(x1*scale,scenario+1, color=self.random_color(file),s=1)
+                    #plt.plot([x1*scale,x2*scale],[scenario+1,scenario+1], color=self.random_color(file),marker="o",markersize=1)
                     #plt.plot([x1*scale,x2*scale],[scenario+1,scenario+1], color=self.random_color(file),linewidth=1)
-                    #plt.scatter(x1*scale,scenario+1, color=self.random_color(file),s=1)             
-           
         avg_time= statistics.mean(self.diffs)        
         stdev_time = statistics.stdev(self.diffs)
         sum_time= sum(self.diffs)
