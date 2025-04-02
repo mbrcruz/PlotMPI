@@ -107,7 +107,7 @@ class MyPlot(object):
         
 
         max= 0
-        self.start_moment = self.start_moment -  60
+        #self.start_moment = self.start_moment -  60
         for i in range(self.number_scenarios):         
          print( f"Ploting scenario {i+1} ...")
          tdiff = 0 
@@ -136,7 +136,7 @@ class MyPlot(object):
         print(f'Sum {count_time}')         
         print(f'Mean {avg_time}')        
         print(f'Stdev {stdev_time}')  
-        print(f'Sum {sum_time}')   
+        print(f'Sum {sum_time/self.number_scenarios}')   
         #plt.xlim(0, max) 
         plt.show()
 
