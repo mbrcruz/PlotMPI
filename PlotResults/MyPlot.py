@@ -3,12 +3,19 @@ import matplotlib.pyplot as plt
 import os
 import random
 import statistics
+from enum import Enum
 
+
+class TypeEvaluation(Enum):
+    JUST_COMUNICATION = 1,
+    COMUNICATION_AND_IO = 2,
+
+    
 class MyPlot(object):
     """description of class"""
 
 
-    def __init__(self, base_directory,number_scenarios,limit):
+    def __init__(self, base_directory,number_scenarios,typeEvaluation= TypeEvaluation.JUST_COMUNICATION,limit=-1):
         self.number_scenarios = number_scenarios
         self.base_directory = base_directory
         self.limit=limit
@@ -19,6 +26,7 @@ class MyPlot(object):
         self.X2=[]
         self.diffs=[]
         self.start_moment=1000000000000000
+        self.typeEvaluation= typeEvaluation
 
     def random_color(self,k):
         if k not in self.colors:
@@ -42,6 +50,7 @@ class MyPlot(object):
                 file = df.iloc[k,2]
                 block = df.iloc[k,3] 
                 time = df.iloc[k,4]
+             
                 if file in self.X1[scenario]:
                     if block in self.X1[i][file] and self.X1[scenario][file][block] < time:
                         continue
@@ -57,7 +66,12 @@ class MyPlot(object):
             scenario = self.df_master.iloc[k,0]-1
             file = self.df_master.iloc[k,1]
             block= self.df_master.iloc[k,2]
-            time = self.df_master.iloc[k,4] 
+
+            if self.typeEvaluation == TypeEvaluation.JUST_COMUNICATION:
+                time = self.df_master.iloc[k,4] 
+            else:
+                time = self.df_master.iloc[k,7]
+
             if scenario < self.number_scenarios:
                 try:
                     if self.X1[scenario][file][block]:
@@ -107,7 +121,7 @@ class MyPlot(object):
         
 
         max= 0
-        #self.start_moment = self.start_moment -  60
+        self.start_moment = self.start_moment -  60
         for i in range(self.number_scenarios):         
          print( f"Ploting scenario {i+1} ...")
          tdiff = 0 
