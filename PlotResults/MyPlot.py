@@ -67,11 +67,18 @@ class MyPlot(object):
             file = self.df_master.iloc[k,1]
             block= self.df_master.iloc[k,2]
 
+            
+
             if self.typeEvaluation == TypeEvaluation.JUST_COMUNICATION:
                 time = self.df_master.iloc[k,4] 
+            elif self.typeEvaluation == TypeEvaluation.COMUNICATION_AND_IO:
+                if self.df_master.iloc[k].count() >= 8:
+                    time = self.df_master.iloc[k,7]
+                else:
+                    raise Exception("Bad formatted file.")
             else:
-                time = self.df_master.iloc[k,7]
-
+                    raise Exception("Bad configuration.")
+            
             if scenario < self.number_scenarios:
                 try:
                     if self.X1[scenario][file][block]:
