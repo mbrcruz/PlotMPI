@@ -141,15 +141,18 @@ class MyPlot(object):
          last_x1=0
          for file in self.X1[i].keys():    
              for block in self.X1[i][file].keys():               
-                x1 = ( self.X1[scenario][file][block] - self.start_moment ) 
-                x2 = ( self.X2[scenario][file][block] - self.start_moment )
+                x1 = ( self.X1[scenario][file][block] - self.start_moment )  
+                try:                    
+                    x2 = ( self.X2[scenario][file][block] - self.start_moment )               
+                except KeyError:
+                    print(f"KeyError {scenario} {file} {block}")
+                    exit(-1)                
                 diff= x2 - x1
                 self.diffs.append(diff)                
-                
                 if x1 < self.limit:
                     plt.scatter(x1*scale,scenario+1, color=self.random_color(file),s=1)
                     #plt.plot([x1*scale,x2*scale],[scenario+1,scenario+1], color=self.random_color(file),marker="o",markersize=1)
-                    #plt.plot([x1*scale,x2*scale],[scenario+1,scenario+1], color=self.random_color(file),linewidth=1)
+                    #plt.plot([x1*scale,x2*scale],[scenario+1,scenario+1], color=self.random_color(file),linewidth=1)                          
         avg_time= statistics.mean(self.diffs)        
         stdev_time = statistics.stdev(self.diffs)
         sum_time= sum(self.diffs)
@@ -159,7 +162,8 @@ class MyPlot(object):
         print(f'Stdev {stdev_time}')  
         print(f'Sum {sum_time/self.number_scenarios}')   
         #plt.xlim(0, max) 
-        plt.show()
+        if self.limit != -1:
+            plt.show()
 
    
 
