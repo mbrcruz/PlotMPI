@@ -25,6 +25,10 @@ class MyPlot(object):
         self.colors={}
         self.X1=[]
         self.X2=[]
+        self.X3=[]
+        self.X4=[]
+      
+
         self.diffs=[]
         self.start_moment=1000000000000000
         self.typeEvaluation= typeEvaluation
@@ -36,18 +40,23 @@ class MyPlot(object):
 
     def load_data(self):
         start = 2
+        if not self.typeEvaluation == TypeEvaluation.JUST_COMUNICATION and not self.typeEvaluation == TypeEvaluation.COMUNICATION_AND_IO and not self.typeEvaluation == TypeEvaluation.JUST_SEND:       
+            raise Exception("Bad configuration.")
+
         for i in range(self.number_scenarios):
             print(f'Loading scenario {i+1}')
             sufix= start +i
             self.X1.append(dict())
-            self.X2.append(dict())            
+            self.X2.append(dict())   
+            self.X3.append(dict()) 
+            self.X4.append(dict()) 
             df= pd.read_csv(os.path.join(self.base_directory ,f"mpiio-{sufix}.log"),header=None)
             
             if ( self.start_moment > df.iloc[0,4] ):
                 self.start_moment= df.iloc[0,4]
            
             for k in range(len(df)):
-                scenario = i 
+                scenario = i
                 file = df.iloc[k,2]
                 block = df.iloc[k,3] 
                 time = df.iloc[k,4]
@@ -57,50 +66,44 @@ class MyPlot(object):
                     if block in self.X1[i][file] and self.X1[scenario][file][block] < time:
                         continue
                     else: 
-                        self.X1[scenario][file][block]= time     
-                        if self.typeEvaluation == TypeEvaluation.JUST_SEND:
-                            self.X2[scenario][file][block]= time2 
+                        self.X1[scenario][file][block]= time                       
+                        self.X2[scenario][file][block]= time2 
                 else:
                     self.X1[scenario][file]={}
-                    self.X1[scenario][file][block]=time
-                    if self.typeEvaluation == TypeEvaluation.JUST_SEND:
-                            self.X2[scenario][file]={}
-                            self.X2[scenario][file][block]= time2 
+                    self.X1[scenario][file][block]=time                   
+                    self.X2[scenario][file]={}
+                    self.X2[scenario][file][block]= time2 
                     
 
-        self.df_master=pd.read_csv(os.path.join(self.base_directory ,f"mpiio-master.log"),header=None)
-        if self.typeEvaluation != TypeEvaluation.JUST_SEND:
+        self.df_master=pd.read_csv(os.path.join(self.base_directory ,f"mpiio-master.log"),header=None)    
+        for k in range(len(self.df_master)):
+            if self.df_master.iloc[k].count() >= 8:
+                time = self.df_master.iloc[k,7]
+            else:
+                raise Exception("Bad formatted file.")
 
-            for k in range(len(self.df_master)):
-                scenario = self.df_master.iloc[k,0]-1
-                file = self.df_master.iloc[k,1]
-                block= self.df_master.iloc[k,2]
-
+            scenario = self.df_master.iloc[k,0]-1
+            file = self.df_master.iloc[k,1]
+            block= self.df_master.iloc[k,2]
+            time = self.df_master.iloc[k,4] 
+            time2= self.df_master.iloc[k,7]
             
-
-                if self.typeEvaluation == TypeEvaluation.JUST_COMUNICATION:
-                    time = self.df_master.iloc[k,4] 
-                elif self.typeEvaluation == TypeEvaluation.COMUNICATION_AND_IO:
-                    if self.df_master.iloc[k].count() >= 8:
-                        time = self.df_master.iloc[k,7]
-                    else:
-                        raise Exception("Bad formatted file.")
-                else:
-                        raise Exception("Bad configuration.")
-            
-                if scenario < self.number_scenarios:
-                    try:
-                        if self.X1[scenario][file][block]:
-                            if file in self.X2[scenario]:
-                                if block in self.X2[scenario][file] and self.X2[scenario][file][block] > time:
-                                    continue
-                                else: 
-                                    self.X2[scenario][file][block]=  time                                                       
-                            else:
-                                self.X2[scenario][file]={}
-                                self.X2[scenario][file][block]= time
-                    except KeyError:
-                        continue
+            if scenario < self.number_scenarios:
+                try:
+                    if self.X1[scenario][file][block]:
+                        if file in self.X3[scenario]:
+                            if block in self.X3[scenario][file] and self.X3[scenario][file][block] > time:
+                                continue
+                            else: 
+                                self.X3[scenario][file][block]=  time     
+                                self.X4[scenario][file][block]=  time2
+                        else:
+                            self.X3[scenario][file]={}
+                            self.X3[scenario][file][block]= time
+                            self.X4[scenario][file]={}
+                            self.X4[scenario][file][block]= time2
+                except KeyError:
+                    continue
 
            
 
@@ -152,11 +155,17 @@ class MyPlot(object):
              for block in self.X1[i][file].keys():               
                 x1 = ( self.X1[scenario][file][block] - self.start_moment )  
                 try:                    
-                    x2 = ( self.X2[scenario][file][block] - self.start_moment )               
+                    x2 = ( self.X2[scenario][file][block] - self.start_moment )  
+                    x3 = ( self.X3[scenario][file][block] - self.start_moment )
+                    x4 = ( self.X4[scenario][file][block] - self.start_moment )
                 except KeyError:
                     print(f"KeyError {scenario} {file} {block}")
-                    exit(-1)                
-                diff= x2 - x1                
+                    exit(-1)   
+                diff = 0 
+                if self.typeEvaluation == TypeEvaluation.JUST_SEND:
+                    diff= x2 - x1
+                else:
+                   diff= (x2 - x1) + (x4 - x3)
                 self.diffs.append(diff)                
                 if x1 < self.limit:
                     plt.scatter(x1*scale,scenario+1, color=self.random_color(file),s=1)
