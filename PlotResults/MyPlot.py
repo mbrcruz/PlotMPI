@@ -139,17 +139,12 @@ class MyPlot(object):
        
         
 
-        max= 0
+        #max= 0
         #self.start_moment = self.start_moment -  60
         for i in range(self.number_scenarios):         
          print( f"Ploting scenario {i+1} ...")
          tdiff = 0 
-         scenario = i         
-         #start_moment= self.df_vec[i].iloc[0,4] 
-         #if self.max_lines > 0:
-         #    max_lines=self.max_lines
-         #else:
-         #   max_lines = len(self.df_vec[i])
+         scenario = i            
          last_x1=0
          for file in self.X1[i].keys():    
              for block in self.X1[i][file].keys():               
@@ -164,8 +159,10 @@ class MyPlot(object):
                 diff = 0 
                 if self.typeEvaluation == TypeEvaluation.JUST_SEND:
                     diff= x2 - x1
+                elif self.typeEvaluation == TypeEvaluation.JUST_COMUNICATION:
+                    diff= (x3 - x1)
                 else:
-                   diff= (x2 - x1) + (x4 - x3)
+                   diff= x4 - x1
                 self.diffs.append(diff)                
                 if x1 < self.limit:
                     plt.scatter(x1*scale,scenario+1, color=self.random_color(file),s=1)
@@ -173,13 +170,15 @@ class MyPlot(object):
                     #plt.plot([x1*scale,x2*scale],[scenario+1,scenario+1], color=self.random_color(file),linewidth=1)                          
         avg_time= statistics.mean(self.diffs)        
         stdev_time = statistics.stdev(self.diffs)
+        max_time = max(self.diffs)
         sum_time= sum(self.diffs)
         count_time= len(self.diffs)
-        print(f'Sum {count_time}')         
+        print(f'Number blocks {count_time}')         
         print(f'Mean per block {avg_time:.2e}')        
         print(f'Stdev per block {stdev_time:.2e}')  
-        mean_per_node = sum_time/self.number_scenarios
-        print(f'Mean per node {mean_per_node}')   
+        print(f'Max per block {max_time:.2e}') 
+        mean_per_process = sum_time/self.number_scenarios
+        print(f'Mean per node {mean_per_process}')   
         #plt.xlim(0, max) 
         if self.limit != -1:
             plt.show()
