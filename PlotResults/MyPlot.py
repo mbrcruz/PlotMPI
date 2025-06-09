@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 import os
 import random
@@ -103,23 +104,12 @@ class MyPlot(object):
                             self.X4[scenario][file]={}
                             self.X4[scenario][file][block]= time2
                 except KeyError:
-                    continue
-
-           
-
-                    
-        
-             
-             
+                    continue    
 
     def show_config(self):
         print( f" Number Scenario {self.number_scenarios}")
         print( f" Base Directory {self.base_directory}")
    
-
-
-
-
     def plot(self):     
         
         small_length=0.1
@@ -183,6 +173,30 @@ class MyPlot(object):
         if self.limit != -1:
             plt.show()
 
-   
+    def plotMean(self,base_directory,plotLabel):
+        
+        df_csv = pd.read_csv(os.path.join(base_directory,"plot.csv"))
+        df_len = len(df_csv)
+        X = np.zeros(df_len)
+        Means = np.zeros(df_len)
+        StdDev = np.zeros(df_len)
+        
+        for i in range(len(df_csv)):
+            X[i]= df_csv.iloc[i,0]
+            Means[i]= df_csv.iloc[i,1]
+            StdDev[i]= df_csv.iloc[i,2]
+        # Plotando com barras de erro vindas da outra série
+        plt.figure(figsize=(8,5))        
+        plt.plot(X, Means, '-o',label='Média de envio dos blocos', color='blue')
+        # Faixa do desvio padrão
+        plt.fill_between(X, Means - StdDev, Means + StdDev, color='blue', alpha=0.2, label='Desvio Padrão')  
+        #plt.ylim(-2,2)
+        plt.title(plotLabel)        
+        plt.xlabel('Número de nós')
+        plt.ylabel('Média(s)')
+        plt.legend()
+        plt.grid(True)
+        plt.show()
+     
 
 
