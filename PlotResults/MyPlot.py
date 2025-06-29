@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import os
+import csv
 import random
 import statistics
 from enum import Enum
@@ -17,8 +18,10 @@ class MyPlot(object):
     """description of class"""
 
 
-    def __init__(self, base_directory,number_scenarios,typeEvaluation= TypeEvaluation.JUST_COMUNICATION,limit=-1):
-        self.number_scenarios = number_scenarios
+    def __init__(self, base_directory,number_nodes, number_scenarios_per_nodes,typeEvaluation= TypeEvaluation.JUST_COMUNICATION,limit=-1):
+        self.number_scenarios = number_nodes * number_scenarios_per_nodes
+        self.number_scenarios_per_nodes = number_scenarios_per_nodes
+        self.number_nodes = number_nodes 
         self.base_directory = base_directory
         self.limit=limit
         self.df_vec= []
@@ -31,6 +34,8 @@ class MyPlot(object):
       
 
         self.diffs=[]
+        self.sizes=[]
+        self.bandwidths=[]
         self.start_moment=1000000000000000
         self.typeEvaluation= typeEvaluation
 
@@ -62,18 +67,19 @@ class MyPlot(object):
                 block = df.iloc[k,3] 
                 time = df.iloc[k,4]
                 time2 = df.iloc[k,5]
+                size = df.iloc[k,7]
              
                 if file in self.X1[scenario]:
                     if block in self.X1[i][file] and self.X1[scenario][file][block] < time:
                         continue
                     else: 
-                        self.X1[scenario][file][block]= time                       
-                        self.X2[scenario][file][block]= time2 
+                        self.X1[scenario][file][block]=  ( time , size )                       
+                        self.X2[scenario][file][block]= ( time2 , size )  
                 else:
                     self.X1[scenario][file]={}
-                    self.X1[scenario][file][block]=time                   
+                    self.X1[scenario][file][block]= ( time , size )                   
                     self.X2[scenario][file]={}
-                    self.X2[scenario][file][block]= time2 
+                    self.X2[scenario][file][block]= ( time , size ) 
                     
 
         self.df_master=pd.read_csv(os.path.join(self.base_directory ,f"mpiio-master.log"),header=None)    
@@ -130,7 +136,7 @@ class MyPlot(object):
         
 
         #max= 0
-        #self.start_moment = self.start_moment -  60
+        self.start_moment = 0
         for i in range(self.number_scenarios):         
          print( f"Ploting scenario {i+1} ...")
          tdiff = 0 
@@ -138,9 +144,10 @@ class MyPlot(object):
          last_x1=0
          for file in self.X1[i].keys():    
              for block in self.X1[i][file].keys():               
-                x1 = ( self.X1[scenario][file][block] - self.start_moment )  
+                x1 = ( self.X1[scenario][file][block][0] - self.start_moment )  
+                size = self.X1[scenario][file][block][1]
                 try:                    
-                    x2 = ( self.X2[scenario][file][block] - self.start_moment )  
+                    x2 = ( self.X2[scenario][file][block][0] - self.start_moment )  
                     x3 = ( self.X3[scenario][file][block] - self.start_moment )
                     x4 = ( self.X4[scenario][file][block] - self.start_moment )
                 except KeyError:
@@ -152,23 +159,37 @@ class MyPlot(object):
                 elif self.typeEvaluation == TypeEvaluation.JUST_COMUNICATION:
                     diff= (x3 - x1)
                 else:
-                   diff= x4 - x1
-                self.diffs.append(diff)                
+                   diff= (x4 - x3) + ( x2 - x1)
+                self.diffs.append(diff)  
+                self.sizes.append(size)  
+                self.bandwidths.append( ( size / diff)  * 8 / 1000000000  )
+
                 if x1 < self.limit:
                     plt.scatter(x1*scale,scenario+1, color=self.random_color(file),s=1)
                     #plt.plot([x1*scale,x2*scale],[scenario+1,scenario+1], color=self.random_color(file),marker="o",markersize=1)
-                    #plt.plot([x1*scale,x2*scale],[scenario+1,scenario+1], color=self.random_color(file),linewidth=1)                          
-        avg_time= statistics.mean(self.diffs)        
-        stdev_time = statistics.stdev(self.diffs)
+                    #plt.plot([x1*scale,x2*scale],[scenario+1,scenario+1], color=self.random_color(file),linewidth=1) 
+          
+        # as 2 contagens nao sao relevantes, porque os buffers tem tamanhos diferentes.            
+        avg_time_per_buffer= statistics.mean(self.diffs)
+        stdev_time_per_block = statistics.stdev(self.diffs)
         max_time = max(self.diffs)
         sum_time= sum(self.diffs)
         count_time= len(self.diffs)
-        print(f'Number blocks {count_time}')         
-        print(f'Mean per block {avg_time:.2e}')        
+        avg_bandwidth = statistics.mean(self.bandwidths)
+        stddev_bandwidth = statistics.stdev(self.bandwidths)
+
+        print(f'Number Buffers {count_time}')         
+        print(f'AVG per block {avg_time_per_buffer:.2e}')        
         print(f'Stdev per block {stdev_time:.2e}')  
         print(f'Max per block {max_time:.2e}') 
-        mean_per_process = sum_time/self.number_scenarios
-        print(f'Mean per node {mean_per_process}')   
+        avg_per_process = sum_time/self.number_scenarios
+        print(f'Mean per node {mean_per_process}') 
+        avg_size = statistics.mean(self.sizes) / 1000000
+        print(f'AVG size MB {avg_bandwidth}') 
+        print(f'AVG Bandwidth Gb/s {avg_bandwidth}') 
+        print(f'Stdev Bandwidth Gb/s {stddev_bandwidth}')
+        self.escreveCsv({ 'Nodes': self.number_nodes, 'Avg_time_per_process': avg_per_process ,'Avg_size': avg_size ,  'Avg_bandwidth': avg_bandwidth, 'Stddev_bandwidth': stddev_bandwidth }   )
+        
         #plt.xlim(0, max) 
         if self.limit != -1:
             plt.show()
@@ -197,6 +218,27 @@ class MyPlot(object):
         plt.legend()
         plt.grid(True)
         plt.show()
+
+
+    def escreveCsv(self,linha):
+        path_csv = os.path.join(self.base_directory,"../plot.csv")
+        cabecalho = ['Nodes', 'Avg_time_per_process', 'Stddev_time', "Avg_bandwidth", "Stddev_bandwidth"]
+        escrever_cabecalho = not os.path.exists(path_csv) or os.path.getsize(path_csv) == 0
+        arquivo_csv = open(path_csv,mode='a',newline='',encoding='utf-8')
+        writer = csv.DictWriter(arquivo_csv, fieldnames=cabecalho)
+        if escrever_cabecalho:
+            writer.writeheader()
+        writer.writerow(linha)
+        arquivo_csv.close()
+
+
+
+
+
+          
+
+
+
      
 
 
