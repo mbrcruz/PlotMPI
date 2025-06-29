@@ -4,7 +4,8 @@ import matplotlib.pyplot as plt
 
 
 
-p =  MyPlot(r"D:\Marcelo\Dropbox (Personal)\Planejamento\Mestrado\Pesquisas\Results\LoboC\Lustre - 2 Series\2-nodes",2, 2,TypeEvaluation.COMUNICATION_AND_IO)
+p =  MyPlot(r"D:\Marcelo\Dropbox (Personal)\Planejamento\Mestrado\Pesquisas\Results\LoboC\Lustre - 2 Series\2-nodes",2,2
+            ,TypeEvaluation.COMUNICATION_AND_IO)
 p.show_config()
 p.load_data()
 p.plot()

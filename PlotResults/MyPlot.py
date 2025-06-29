@@ -171,24 +171,29 @@ class MyPlot(object):
           
         # as 2 contagens nao sao relevantes, porque os buffers tem tamanhos diferentes.            
         avg_time_per_buffer= statistics.mean(self.diffs)
-        stdev_time_per_block = statistics.stdev(self.diffs)
-        max_time = max(self.diffs)
+        stdev_time_per_buffer = statistics.stdev(self.diffs)
+        max_time_per_buffer = max(self.diffs)
         sum_time= sum(self.diffs)
-        count_time= len(self.diffs)
+        count_buffer= len(self.diffs)
+        print(f'Number Buffers: {count_buffer}')         
+        print(f'AVG per Buffers: {avg_time_per_buffer:.2e}')        
+        print(f'Stdev per Buffers: {stdev_time_per_buffer:.2e}')  
+        print(f'Max per Buffers: {max_time_per_buffer:.2e}') 
+
+        avg_per_process = sum_time/self.number_scenarios
+        print(f'Avg per Process(s): {avg_per_process}') 
+
+        avg_size = statistics.mean(self.sizes) / 1000000
+        total_size_per_nodes = sum(self.sizes) / 1000000000 / self.number_nodes
+        print(f'AVG size buffer (MB): {avg_size:.2f}') 
+        print(f'Total size per node (GB): {total_size_per_nodes:.2f}') 
+
         avg_bandwidth = statistics.mean(self.bandwidths)
         stddev_bandwidth = statistics.stdev(self.bandwidths)
+        print(f'AVG Bandwidth (Gb/s): {avg_bandwidth:.2f}') 
+        print(f'Stdev Bandwidth (Gb/s): {stddev_bandwidth:.2f}')
 
-        print(f'Number Buffers {count_time}')         
-        print(f'AVG per block {avg_time_per_buffer:.2e}')        
-        print(f'Stdev per block {stdev_time:.2e}')  
-        print(f'Max per block {max_time:.2e}') 
-        avg_per_process = sum_time/self.number_scenarios
-        print(f'Mean per node {mean_per_process}') 
-        avg_size = statistics.mean(self.sizes) / 1000000
-        print(f'AVG size MB {avg_bandwidth}') 
-        print(f'AVG Bandwidth Gb/s {avg_bandwidth}') 
-        print(f'Stdev Bandwidth Gb/s {stddev_bandwidth}')
-        self.escreveCsv({ 'Nodes': self.number_nodes, 'Avg_time_per_process': avg_per_process ,'Avg_size': avg_size ,  'Avg_bandwidth': avg_bandwidth, 'Stddev_bandwidth': stddev_bandwidth }   )
+        self.escreveCsv({ 'Nodes': self.number_nodes, 'Avg_time_per_process': avg_per_process,  'Avg_bandwidth': avg_bandwidth, 'Stddev_bandwidth': stddev_bandwidth }   )
         
         #plt.xlim(0, max) 
         if self.limit != -1:
@@ -222,7 +227,7 @@ class MyPlot(object):
 
     def escreveCsv(self,linha):
         path_csv = os.path.join(self.base_directory,"../plot.csv")
-        cabecalho = ['Nodes', 'Avg_time_per_process', 'Stddev_time', "Avg_bandwidth", "Stddev_bandwidth"]
+        cabecalho = ['Nodes', 'Avg_time_per_process', "Avg_bandwidth", "Stddev_bandwidth"]
         escrever_cabecalho = not os.path.exists(path_csv) or os.path.getsize(path_csv) == 0
         arquivo_csv = open(path_csv,mode='a',newline='',encoding='utf-8')
         writer = csv.DictWriter(arquivo_csv, fieldnames=cabecalho)
