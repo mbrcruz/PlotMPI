@@ -79,7 +79,7 @@ class MyPlot(object):
                     self.X1[scenario][file]={}
                     self.X1[scenario][file][block]= ( time , size )                   
                     self.X2[scenario][file]={}
-                    self.X2[scenario][file][block]= ( time , size ) 
+                    self.X2[scenario][file][block]= ( time2 , size ) 
                     
 
         self.df_master=pd.read_csv(os.path.join(self.base_directory ,f"mpiio-master.log"),header=None)    
@@ -159,10 +159,14 @@ class MyPlot(object):
                 elif self.typeEvaluation == TypeEvaluation.JUST_COMUNICATION:
                     diff= (x3 - x1)
                 else:
-                   diff= (x4 - x3) + ( x2 - x1)
+                   diff= (x4 - x3 ) + ( x2 - x1)
                 self.diffs.append(diff)  
                 self.sizes.append(size)  
-                self.bandwidths.append( ( size / diff)  * 8 / 1000000000  )
+                if diff <= 0:
+                    print(f"Diff is zero or negative: {diff} for {scenario} {file} {block}")
+                    continue
+                else:
+                    self.bandwidths.append( ( size * 8 / 1000000000 ) / diff )
 
                 if x1 < self.limit:
                     plt.scatter(x1*scale,scenario+1, color=self.random_color(file),s=1)
@@ -229,12 +233,12 @@ class MyPlot(object):
         path_csv = os.path.join(self.base_directory,"../plot.csv")
         cabecalho = ['Nodes', 'Avg_time_per_process', "Avg_bandwidth", "Stddev_bandwidth"]
         escrever_cabecalho = not os.path.exists(path_csv) or os.path.getsize(path_csv) == 0
-        arquivo_csv = open(path_csv,mode='a',newline='',encoding='utf-8')
-        writer = csv.DictWriter(arquivo_csv, fieldnames=cabecalho)
-        if escrever_cabecalho:
-            writer.writeheader()
-        writer.writerow(linha)
-        arquivo_csv.close()
+        with open(path_csv,mode='a',newline='',encoding='utf-8') as arquivo_csv:
+            writer = csv.DictWriter(arquivo_csv, fieldnames=cabecalho)
+            if escrever_cabecalho:
+                writer.writeheader()
+            writer.writerow(linha)
+            arquivo_csv.close()
 
 
 
