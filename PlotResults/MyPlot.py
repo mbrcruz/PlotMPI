@@ -18,10 +18,10 @@ class MyPlot(object):
     """description of class"""
 
 
-    def __init__(self, base_directory,number_nodes, number_scenarios_per_nodes,typeEvaluation= TypeEvaluation.JUST_COMUNICATION,limit=-1):
-        self.number_scenarios = number_nodes * number_scenarios_per_nodes
-        self.number_scenarios_per_nodes = number_scenarios_per_nodes
+    def __init__(self, base_directory,number_nodes, number_scenarios,typeEvaluation= TypeEvaluation.JUST_COMUNICATION,limit=-1):
         self.number_nodes = number_nodes 
+        self.number_scenarios =  number_scenarios
+        self.number_scenarios_per_nodes = number_scenarios / number_nodes        
         self.base_directory = base_directory
         self.limit=limit
         self.df_vec= []
@@ -31,6 +31,7 @@ class MyPlot(object):
         self.X2=[]
         self.X3=[]
         self.X4=[]
+        self.Simulations=[]
       
 
         self.diffs=[]
@@ -49,25 +50,27 @@ class MyPlot(object):
         if not self.typeEvaluation == TypeEvaluation.JUST_COMUNICATION and not self.typeEvaluation == TypeEvaluation.COMUNICATION_AND_IO and not self.typeEvaluation == TypeEvaluation.JUST_SEND:       
             raise Exception("Bad configuration.")
 
-        for i in range(self.number_scenarios):
+        for i in range(self.number_nodes):
+            
             print(f'Loading scenario {i+1}')
             sufix= start +i
             self.X1.append(dict())
             self.X2.append(dict())   
             self.X3.append(dict()) 
             self.X4.append(dict()) 
+
             df= pd.read_csv(os.path.join(self.base_directory ,f"mpiio-{sufix}.log"),header=None)
             
-            if ( self.start_moment > df.iloc[0,4] ):
-                self.start_moment= df.iloc[0,4]
+            if ( self.start_moment > df.iloc[0,5] ):
+                self.start_moment= df.iloc[0,5]
            
             for k in range(len(df)):
-                scenario = i
-                file = df.iloc[k,2]
-                block = df.iloc[k,3] 
-                time = df.iloc[k,4]
-                time2 = df.iloc[k,5]
-                size = df.iloc[k,7]
+                scenario = df.iloc[k,2]
+                file = df.iloc[k,3]
+                block = df.iloc[k,4] 
+                time = df.iloc[k,5]
+                time2 = df.iloc[k,6]
+                size = df.iloc[k,8]
              
                 if file in self.X1[scenario]:
                     if block in self.X1[i][file] and self.X1[scenario][file][block] < time:
@@ -80,37 +83,44 @@ class MyPlot(object):
                     self.X1[scenario][file][block]= ( time , size )                   
                     self.X2[scenario][file]={}
                     self.X2[scenario][file][block]= ( time2 , size ) 
-                    
 
-        self.df_master=pd.read_csv(os.path.join(self.base_directory ,f"mpiio-master.log"),header=None)    
-        for k in range(len(self.df_master)):
-            if self.df_master.iloc[k].count() >= 8:
-                time = self.df_master.iloc[k,7]
-            else:
-                raise Exception("Bad formatted file.")
-
-            scenario = self.df_master.iloc[k,0]-1
-            file = self.df_master.iloc[k,1]
-            block= self.df_master.iloc[k,2]
-            time = self.df_master.iloc[k,4] 
-            time2= self.df_master.iloc[k,7]
             
-            if scenario < self.number_scenarios:
-                try:
-                    if self.X1[scenario][file][block]:
-                        if file in self.X3[scenario]:
-                            if block in self.X3[scenario][file] and self.X3[scenario][file][block] > time:
-                                continue
-                            else: 
-                                self.X3[scenario][file][block]=  time     
-                                self.X4[scenario][file][block]=  time2
-                        else:
-                            self.X3[scenario][file]={}
-                            self.X3[scenario][file][block]= time
-                            self.X4[scenario][file]={}
-                            self.X4[scenario][file][block]= time2
-                except KeyError:
-                    continue    
+            self.df_times= pd.read_csv(os.path.join(self.base_directory ,f"sddptimer{sufix:04d}.log"),header=None)
+            for k in range(len(self.df_times)):
+                if  self.df_times.iloc[k,0] == "Simulation":
+                    self.Simulations.append(float(self.df_times.iloc[k,1]))                   
+                           
+
+        # self.df_master=pd.read_csv(os.path.join(self.base_directory ,f"mpiio-master.log"),header=None)    
+        # for k in range(len(self.df_master)):
+        #     if self.df_master.iloc[k].count() >= 8:
+        #         time = self.df_master.iloc[k,7]
+        #     else:
+        #         raise Exception("Bad formatted file.")
+
+        #     scenario = self.df_master.iloc[k,0]-1
+        #     file = self.df_master.iloc[k,1]
+        #     block= self.df_master.iloc[k,2]
+        #     time = self.df_master.iloc[k,4] 
+        #     time2= self.df_master.iloc[k,7]
+            
+        #     if scenario < self.number_scenarios:
+        #         try:
+        #             if self.X1[scenario][file][block]:
+        #                 if file in self.X3[scenario]:
+        #                     if block in self.X3[scenario][file] and self.X3[scenario][file][block] > time:
+        #                         continue
+        #                     else: 
+        #                         self.X3[scenario][file][block]=  time     
+        #                         self.X4[scenario][file][block]=  time2
+        #                 else:
+        #                     self.X3[scenario][file]={}
+        #                     self.X3[scenario][file][block]= time
+        #                     self.X4[scenario][file]={}
+        #                     self.X4[scenario][file][block]= time2
+        #         except KeyError:
+        #             continue   
+       
 
     def show_config(self):
         print( f" Number Scenario {self.number_scenarios}")
@@ -179,13 +189,17 @@ class MyPlot(object):
         max_time_per_buffer = max(self.diffs)
         sum_time= sum(self.diffs)
         count_buffer= len(self.diffs)
+        avg_simulation = statistics.mean(self.Simulations)
+        stdev_simulation  = statistics.stdev(self.Simulations)
         print(f'Number Buffers: {count_buffer}')         
         print(f'AVG per Buffers: {avg_time_per_buffer:.2e}')        
         print(f'Stdev per Buffers: {stdev_time_per_buffer:.2e}')  
         print(f'Max per Buffers: {max_time_per_buffer:.2e}') 
 
         avg_per_process = sum_time/self.number_scenarios
-        print(f'Avg per Process(s): {avg_per_process}') 
+        print(f'Avg Comunication per Process(s): {avg_per_process}') 
+        print(f'Avg Simulation per Process(s): {avg_simulation}') 
+        print(f'StdDev Simulation per Process(s): {stdev_simulation}') 
 
         avg_size = statistics.mean(self.sizes) / 1000000
         total_size_per_nodes = sum(self.sizes) / 1000000000 / self.number_nodes
@@ -197,41 +211,75 @@ class MyPlot(object):
         print(f'AVG Bandwidth (Gb/s): {avg_bandwidth:.2f}') 
         print(f'Stdev Bandwidth (Gb/s): {stddev_bandwidth:.2f}')
 
-        self.escreveCsv({ 'Nodes': self.number_nodes, 'Avg_time_per_process': avg_per_process,  'Avg_bandwidth': avg_bandwidth, 'Stddev_bandwidth': stddev_bandwidth }   )
+        # self.escreveCsv({ 'Nodes': self.number_nodes, 
+        #                  'Avg_Simulation':  avg_simulation , 'Stdev_simulation': stdev_simulation,
+        #                  'Avg_time_per_process': avg_per_process, 'Stdev_time_per_process': stdev_time_per_buffer,
+        #                  'Avg_bandwidth': avg_bandwidth, 'Stddev_bandwidth': stddev_bandwidth }   )
         
         #plt.xlim(0, max) 
         if self.limit != -1:
             plt.show()
 
-    def plotMean(self,base_directory,plotLabel):
+    def plotBandwidth(self,base_directory,plotLabel):
         
-        df_csv = pd.read_csv(os.path.join(base_directory,"plot.csv"))
+        df_csv = pd.read_csv(os.path.join(base_directory,"../plot.csv"),index_col='Nodes')
         df_len = len(df_csv)
         X = np.zeros(df_len)
-        Means = np.zeros(df_len)
-        StdDev = np.zeros(df_len)
+        categorias = [ "2 Nodes", "4 Nodes", "8 Nodes", "16 Nodes"]
+        avgBandwidth = np.zeros(df_len)
+        stdDevBandwidth = np.zeros(df_len)
         
         for i in range(len(df_csv)):
-            X[i]= df_csv.iloc[i,0]
-            Means[i]= df_csv.iloc[i,1]
-            StdDev[i]= df_csv.iloc[i,2]
+            X[i]= i
+            avgBandwidth[i]= df_csv.iloc[i]['Avg_bandwidth']
+            stdDevBandwidth[i]= df_csv.iloc[i]['Stddev_bandwidth']
         # Plotando com barras de erro vindas da outra série
-        plt.figure(figsize=(8,5))        
-        plt.plot(X, Means, '-o',label='Média de envio dos blocos', color='blue')
-        # Faixa do desvio padrão
-        plt.fill_between(X, Means - StdDev, Means + StdDev, color='blue', alpha=0.2, label='Desvio Padrão')  
-        #plt.ylim(-2,2)
-        plt.title(plotLabel)        
-        plt.xlabel('Número de nós')
-        plt.ylabel('Média(s)')
-        plt.legend()
-        plt.grid(True)
+        plt.figure(figsize=(8,5))      
+        plt.bar(X, avgBandwidth, yerr=stdDevBandwidth, capsize=8, color='lightgreen', edgecolor='black') 
+
+        plt.xticks(X, categorias)
+        plt.ylabel('Banda Média')
+        plt.title(f'Banda média por envio de buffer no {plotLabel} com erro padrão')
+        plt.grid(True, axis='y', linestyle='--', alpha=0.5)
+        plt.tight_layout()       
         plt.show()
 
 
+
+    def plotExecutionTime(self,base_directory,plotLabel):
+        
+        df_csv = pd.read_csv(os.path.join(base_directory,"../plot.csv"),index_col='Nodes')
+        df_len = len(df_csv)
+        X = np.zeros(df_len)
+        largura = 0.25
+        categorias = [ "2 Nodes", "4 Nodes", "8 Nodes", "16 Nodes"]
+        avgBandwidth = np.zeros(df_len)
+        Stdev_simulation = np.zeros(df_len)
+        Avg_time_per_process = np.zeros(df_len)
+        
+        for i in range(len(df_csv)):
+            X[i]= i
+            avgBandwidth[i]= df_csv.iloc[i]['Avg_Simulation']
+            Stdev_simulation[i]= df_csv.iloc[i]['Stdev_simulation']
+            Avg_time_per_process[i]= df_csv.iloc[i]['Avg_time_per_process']
+        # Plotando com barras de erro vindas da outra série
+        plt.figure(figsize=(8,5))      
+        plt.bar(X - largura/2, avgBandwidth, yerr=Stdev_simulation, width=largura, color='lightgreen', edgecolor='black') 
+        plt.bar(X + largura/2, Avg_time_per_process, width=largura, color='blue', edgecolor='black') 
+
+        plt.xticks(X, categorias)
+        plt.ylabel('tempo de simulação médio (s)')
+        plt.title(f'tempo de simulação médio (s) no {plotLabel} com desvio padrão.')
+        plt.grid(True, axis='y', linestyle='--', alpha=0.5)
+        plt.tight_layout()       
+        plt.show()
+
     def escreveCsv(self,linha):
         path_csv = os.path.join(self.base_directory,"../plot.csv")
-        cabecalho = ['Nodes', 'Avg_time_per_process', "Avg_bandwidth", "Stddev_bandwidth"]
+        cabecalho = ['Nodes', 
+                     'Avg_Simulation', 'Stdev_simulation',
+                     'Avg_time_per_process','Stdev_time_per_process', 
+                     "Avg_bandwidth", "Stddev_bandwidth"]
         escrever_cabecalho = not os.path.exists(path_csv) or os.path.getsize(path_csv) == 0
         with open(path_csv,mode='a',newline='',encoding='utf-8') as arquivo_csv:
             writer = csv.DictWriter(arquivo_csv, fieldnames=cabecalho)
