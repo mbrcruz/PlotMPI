@@ -18,10 +18,11 @@ class MyPlot(object):
     """description of class"""
 
 
-    def __init__(self, base_directory,number_nodes, number_scenarios,typeEvaluation= TypeEvaluation.JUST_COMUNICATION,limit=-1):
+    def __init__(self, base_directory,number_nodes, number_scenarios_per_node, number_scenarios, typeEvaluation= TypeEvaluation.JUST_COMUNICATION,limit=-1):
         self.number_nodes = number_nodes 
+        self.number_scenarios_per_nodes = number_scenarios_per_node
         self.number_scenarios =  number_scenarios
-        self.number_scenarios_per_nodes = number_scenarios / number_nodes        
+                
         self.base_directory = base_directory
         self.limit=limit
         self.df_vec= []
@@ -37,6 +38,7 @@ class MyPlot(object):
         self.diffs=[]
         self.sizes=[]
         self.bandwidths=[]
+        self.numberBuffers=0
         self.start_moment=1000000000000000
         self.typeEvaluation= typeEvaluation
 
@@ -46,18 +48,22 @@ class MyPlot(object):
         return self.colors[k]
 
     def load_data(self):
-        start = 2
+        
         if not self.typeEvaluation == TypeEvaluation.JUST_COMUNICATION and not self.typeEvaluation == TypeEvaluation.COMUNICATION_AND_IO and not self.typeEvaluation == TypeEvaluation.JUST_SEND:       
             raise Exception("Bad configuration.")
+        
 
-        for i in range(self.number_nodes):
+        self.X1= {i: {} for i in range(1, self.number_scenarios+1 )}
+        self.X2= {i: {} for i in range(1, self.number_scenarios+1 )}
+        self.X3= {i: {} for i in range(1, self.number_scenarios+1 )}
+        self.X4= {i: {} for i in range(1, self.number_scenarios+1 )}
+
+        start = 2
+        for i in range(self.number_nodes * self.number_scenarios_per_nodes):
             
-            print(f'Loading scenario {i+1}')
+            print(f'Loading Node {i+1}')
             sufix= start +i
-            self.X1.append(dict())
-            self.X2.append(dict())   
-            self.X3.append(dict()) 
-            self.X4.append(dict()) 
+           
 
             df= pd.read_csv(os.path.join(self.base_directory ,f"mpiio-{sufix}.log"),header=None)
             
@@ -65,31 +71,31 @@ class MyPlot(object):
                 self.start_moment= df.iloc[0,5]
            
             for k in range(len(df)):
+                self.numberBuffers += 1
                 scenario = df.iloc[k,2]
                 file = df.iloc[k,3]
-                block = df.iloc[k,4] 
+                seq = df.iloc[k,4] 
                 time = df.iloc[k,5]
                 time2 = df.iloc[k,6]
                 size = df.iloc[k,8]
              
                 if file in self.X1[scenario]:
-                    if block in self.X1[i][file] and self.X1[scenario][file][block] < time:
+                    if seq in self.X1[scenario][file] and self.X1[scenario][file][seq] < time:
                         continue
                     else: 
-                        self.X1[scenario][file][block]=  ( time , size )                       
-                        self.X2[scenario][file][block]= ( time2 , size )  
+                        self.X1[scenario][file][seq]=  ( time , size )                       
+                        self.X2[scenario][file][seq]= ( time2 , size )  
                 else:
                     self.X1[scenario][file]={}
-                    self.X1[scenario][file][block]= ( time , size )                   
+                    self.X1[scenario][file][seq]= ( time , size )                   
                     self.X2[scenario][file]={}
-                    self.X2[scenario][file][block]= ( time2 , size ) 
+                    self.X2[scenario][file][seq]= ( time2 , size ) 
 
             
             self.df_times= pd.read_csv(os.path.join(self.base_directory ,f"sddptimer{sufix:04d}.log"),header=None)
             for k in range(len(self.df_times)):
                 if  self.df_times.iloc[k,0] == "Simulation":
-                    self.Simulations.append(float(self.df_times.iloc[k,1]))                   
-                           
+                    self.Simulations.append(float(self.df_times.iloc[k,1]))  
 
         # self.df_master=pd.read_csv(os.path.join(self.base_directory ,f"mpiio-master.log"),header=None)    
         # for k in range(len(self.df_master)):
@@ -146,40 +152,42 @@ class MyPlot(object):
         
 
         #max= 0
+        ind= 0
         self.start_moment = 0
-        for i in range(self.number_scenarios):         
-         print( f"Ploting scenario {i+1} ...")
-         tdiff = 0 
-         scenario = i            
-         last_x1=0
-         for file in self.X1[i].keys():    
-             for block in self.X1[i][file].keys():               
-                x1 = ( self.X1[scenario][file][block][0] - self.start_moment )  
-                size = self.X1[scenario][file][block][1]
-                try:                    
-                    x2 = ( self.X2[scenario][file][block][0] - self.start_moment )  
-                    x3 = ( self.X3[scenario][file][block] - self.start_moment )
-                    x4 = ( self.X4[scenario][file][block] - self.start_moment )
-                except KeyError:
-                    print(f"KeyError {scenario} {file} {block}")
-                    exit(-1)   
-                diff = 0 
-                if self.typeEvaluation == TypeEvaluation.JUST_SEND:
-                    diff= x2 - x1
-                elif self.typeEvaluation == TypeEvaluation.JUST_COMUNICATION:
-                    diff= (x3 - x1)
-                else:
-                   diff= (x4 - x3 ) + ( x2 - x1)
-                self.diffs.append(diff)  
-                self.sizes.append(size)  
-                if diff <= 0:
-                    print(f"Diff is zero or negative: {diff} for {scenario} {file} {block}")
-                    continue
-                else:
-                    self.bandwidths.append( ( size * 8 / 1000000000 ) / diff )
+        for i in range(self.number_scenarios):    
+            scenario = i+1        
+            print( f"Ploting scenario {scenario} ...")
+            tdiff = 0                  
+            last_x1=0
+            for file in self.X1[scenario]:
+                for block in self.X1[scenario][file]:               
+                    x1 = ( self.X1[scenario][file][block][0] - self.start_moment )  
+                    size = self.X1[scenario][file][block][1]
+                    try:                    
+                        x2 = ( self.X2[scenario][file][block][0] - self.start_moment )  
+                        x3 = None #( self.X3[scenario][file][block] - self.start_moment )
+                        x4 = None#( self.X4[scenario][file][block] - self.start_moment )
+                    except KeyError:
+                        print(f"KeyError {scenario} {file} {block}")
+                        exit(-1)   
+                    diff = 0 
 
-                if x1 < self.limit:
-                    plt.scatter(x1*scale,scenario+1, color=self.random_color(file),s=1)
+                    if self.typeEvaluation == TypeEvaluation.JUST_SEND:
+                        diff= x2 - x1
+                    elif self.typeEvaluation == TypeEvaluation.JUST_COMUNICATION:
+                        diff= (x3 - x1)
+                    else:
+                        diff= (x4 - x3 ) + ( x2 - x1)
+                                       
+                    if diff <= 0:
+                         print(f"Diff is zero or negative: {diff} for {scenario} {file} {block}")        
+                         continue              
+                    else:
+                        self.diffs.append(diff)  
+                        self.sizes.append(size)
+                        self.bandwidths.append( ( size * 8 / 1000000000 ) / diff )
+                    #if x1 < self.limit:
+                    #    plt.scatter(x1*scale,scenario+1, color=self.random_color(file),s=1)
                     #plt.plot([x1*scale,x2*scale],[scenario+1,scenario+1], color=self.random_color(file),marker="o",markersize=1)
                     #plt.plot([x1*scale,x2*scale],[scenario+1,scenario+1], color=self.random_color(file),linewidth=1) 
           
@@ -191,7 +199,8 @@ class MyPlot(object):
         count_buffer= len(self.diffs)
         avg_simulation = statistics.mean(self.Simulations)
         stdev_simulation  = statistics.stdev(self.Simulations)
-        print(f'Number Buffers: {count_buffer}')         
+        print(f'Number Buffers: {count_buffer}') 
+        print(f'Number Buffers2: {self.numberBuffers}')           
         print(f'AVG per Buffers: {avg_time_per_buffer:.2e}')        
         print(f'Stdev per Buffers: {stdev_time_per_buffer:.2e}')  
         print(f'Max per Buffers: {max_time_per_buffer:.2e}') 

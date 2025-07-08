@@ -3,10 +3,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
+path_dados = r"D:\Marcelo\Dropbox (Personal)\Planejamento\Mestrado\Pesquisas\Results\AWS\Lustre - 112 Series - Com rede\2 Nodes"
 
-p =  MyPlot(r"D:\Marcelo\Dropbox (Personal)\Planejamento\Mestrado\Pesquisas\Results\LoboC\Lustre - 2 Series\16-nodes", 8,2
-            ,TypeEvaluation.JUST_SEND)
+p =  MyPlot(path_dados,
+            2 , 7, 112 ,TypeEvaluation.JUST_SEND)
 p.show_config()
 p.load_data()
 p.plot()
-#p.plotMean(r"D:\Marcelo\Dropbox (Personal)\Planejamento\Mestrado\Pesquisas\Results\LoboC\Lustre - 3 series","LoboC")
+# p.plotBandwidth(path_dados,"LoboC")
+# p.plotExecutionTime(path_dados,"LoboC")
