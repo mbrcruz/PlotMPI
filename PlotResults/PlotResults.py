@@ -9,6 +9,6 @@ p =  MyPlot(path_dados,
             2 , 7, 112 ,TypeEvaluation.JUST_SEND)
 p.show_config()
 p.load_data()
-p.plot()
+p.computerMetrics()
 # p.plotBandwidth(path_dados,"LoboC")
 # p.plotExecutionTime(path_dados,"LoboC")

@@ -61,7 +61,7 @@ class MyPlot(object):
         start = 2
         for i in range(self.number_nodes * self.number_scenarios_per_nodes):
             
-            print(f'Loading Node {i+1}')
+            print(f'Loading Scenarios {i+1}')
             sufix= start +i
            
 
@@ -132,22 +132,22 @@ class MyPlot(object):
         print( f" Number Scenario {self.number_scenarios}")
         print( f" Base Directory {self.base_directory}")
    
-    def plot(self):     
+    def computerMetrics(self):     
         
         small_length=0.1
         scale = 10**6            
-        plt.ylim(0, self.number_scenarios+1)
+        #plt.ylim(0, self.number_scenarios+1)
         #plt.xscale('log')
         #plt.yscale('linear')
         if self.limit==0:
             self.limit=3000
-        plt.xlim(0, self.limit*scale)
-        plt.xlabel('Time in microseconds(ms)')
-        plt.ylabel('Core Id')
+        # plt.xlim(0, self.limit*scale)
+        # plt.xlabel('Time in microseconds(ms)')
+        # plt.ylabel('Core Id')
 
-        plt.grid(True, linestyle='--', color='gray', alpha=0.5)   
-        plt.axhline(y=0, color='k', linewidth=0.1)
-        plt.axvline(x=0, color='k', linewidth=0.1)
+        # plt.grid(True, linestyle='--', color='gray', alpha=0.5)   
+        # plt.axhline(y=0, color='k', linewidth=0.1)
+        # plt.axvline(x=0, color='k', linewidth=0.1)
        
         
 
@@ -199,8 +199,7 @@ class MyPlot(object):
         count_buffer= len(self.diffs)
         avg_simulation = statistics.mean(self.Simulations)
         stdev_simulation  = statistics.stdev(self.Simulations)
-        print(f'Number Buffers: {count_buffer}') 
-        print(f'Number Buffers2: {self.numberBuffers}')           
+        print(f'Number Buffers: {count_buffer}')                
         print(f'AVG per Buffers: {avg_time_per_buffer:.2e}')        
         print(f'Stdev per Buffers: {stdev_time_per_buffer:.2e}')  
         print(f'Max per Buffers: {max_time_per_buffer:.2e}') 
@@ -220,14 +219,14 @@ class MyPlot(object):
         print(f'AVG Bandwidth (Gb/s): {avg_bandwidth:.2f}') 
         print(f'Stdev Bandwidth (Gb/s): {stddev_bandwidth:.2f}')
 
-        # self.escreveCsv({ 'Nodes': self.number_nodes, 
-        #                  'Avg_Simulation':  avg_simulation , 'Stdev_simulation': stdev_simulation,
-        #                  'Avg_time_per_process': avg_per_process, 'Stdev_time_per_process': stdev_time_per_buffer,
-        #                  'Avg_bandwidth': avg_bandwidth, 'Stddev_bandwidth': stddev_bandwidth }   )
+        self.escreveCsv({ 'Nodes': self.number_nodes, 
+                         'Avg_Simulation':  avg_simulation , 'Stdev_simulation': stdev_simulation,
+                         'Avg_time_per_process': avg_per_process, 'Stdev_time_per_process': stdev_time_per_buffer,
+                         'Avg_bandwidth': avg_bandwidth, 'Stddev_bandwidth': stddev_bandwidth }   )
         
         #plt.xlim(0, max) 
-        if self.limit != -1:
-            plt.show()
+        # if self.limit != -1:
+        #     plt.show()
 
     def plotBandwidth(self,base_directory,plotLabel):
         
