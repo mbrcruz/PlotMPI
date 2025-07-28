@@ -12,13 +12,14 @@ class TypeEvaluation(Enum):
     JUST_COMUNICATION = 1,
     COMUNICATION_AND_IO = 2,
     JUST_SEND = 3,
+    JUST_REMOTE_SEND = 4,
 
     
 class MyPlot(object):
     """description of class"""
 
 
-    def __init__(self, base_directory,number_nodes, number_scenarios_per_node, number_scenarios, typeEvaluation= TypeEvaluation.JUST_COMUNICATION,limit=-1):
+    def __init__(self, base_directory,number_nodes, number_scenarios_per_node, number_scenarios, typeEvaluation= TypeEvaluation.JUST_COMUNICATION,  limit=-1):
         self.number_nodes = number_nodes 
         self.number_scenarios_per_nodes = number_scenarios_per_node
         self.number_scenarios =  number_scenarios
@@ -33,7 +34,7 @@ class MyPlot(object):
         self.X3=[]
         self.X4=[]
         self.Simulations=[]
-      
+        self.localScenarios=[]      
 
         self.diffs=[]
         self.sizes=[]
@@ -49,7 +50,10 @@ class MyPlot(object):
 
     def load_data(self):
         
-        if not self.typeEvaluation == TypeEvaluation.JUST_COMUNICATION and not self.typeEvaluation == TypeEvaluation.COMUNICATION_AND_IO and not self.typeEvaluation == TypeEvaluation.JUST_SEND:       
+        if ( not self.typeEvaluation == TypeEvaluation.JUST_COMUNICATION 
+        and not self.typeEvaluation == TypeEvaluation.COMUNICATION_AND_IO
+        and not self.typeEvaluation == TypeEvaluation.JUST_REMOTE_SEND
+        and not self.typeEvaluation == TypeEvaluation.JUST_SEND):          
             raise Exception("Bad configuration.")
         
 
@@ -60,16 +64,13 @@ class MyPlot(object):
 
         start = 2
         for i in range(self.number_nodes * self.number_scenarios_per_nodes):
-            
-            print(f'Loading Scenarios {i+1}')
-            sufix= start +i
-           
-
+            sufix= start +i        
+            print(f'Loading Processes {i+1}')
             df= pd.read_csv(os.path.join(self.base_directory ,f"mpiio-{sufix}.log"),header=None)
-            
+                
             if ( self.start_moment > df.iloc[0,5] ):
                 self.start_moment= df.iloc[0,5]
-           
+        
             for k in range(len(df)):
                 self.numberBuffers += 1
                 scenario = df.iloc[k,2]
@@ -78,7 +79,10 @@ class MyPlot(object):
                 time = df.iloc[k,5]
                 time2 = df.iloc[k,6]
                 size = df.iloc[k,8]
-             
+                
+                if self.typeEvaluation == TypeEvaluation.JUST_REMOTE_SEND and i < self.number_scenarios_per_nodes:
+                    if scenario not in self.localScenarios:
+                        self.localScenarios.append(scenario)                       
                 if file in self.X1[scenario]:
                     if seq in self.X1[scenario][file] and self.X1[scenario][file][seq] < time:
                         continue
@@ -132,7 +136,7 @@ class MyPlot(object):
         print( f" Number Scenario {self.number_scenarios}")
         print( f" Base Directory {self.base_directory}")
    
-    def computerMetrics(self):     
+    def computerMetrics(self,escrever_csv=True):     
         
         small_length=0.1
         scale = 10**6            
@@ -159,39 +163,42 @@ class MyPlot(object):
             print( f"Ploting scenario {scenario} ...")
             tdiff = 0                  
             last_x1=0
-            for file in self.X1[scenario]:
-                for block in self.X1[scenario][file]:               
-                    x1 = ( self.X1[scenario][file][block][0] - self.start_moment )  
-                    size = self.X1[scenario][file][block][1]
-                    try:                    
-                        x2 = ( self.X2[scenario][file][block][0] - self.start_moment )  
-                        x3 = None #( self.X3[scenario][file][block] - self.start_moment )
-                        x4 = None#( self.X4[scenario][file][block] - self.start_moment )
-                    except KeyError:
-                        print(f"KeyError {scenario} {file} {block}")
-                        exit(-1)   
-                    diff = 0 
+            if scenario in self.localScenarios:              
+                continue
+            else:
+                for file in self.X1[scenario]:
+                    for block in self.X1[scenario][file]:               
+                        x1 = ( self.X1[scenario][file][block][0] - self.start_moment )  
+                        size = self.X1[scenario][file][block][1]
+                        try:                    
+                            x2 = ( self.X2[scenario][file][block][0] - self.start_moment )  
+                            x3 = None #( self.X3[scenario][file][block] - self.start_moment )
+                            x4 = None#( self.X4[scenario][file][block] - self.start_moment )
+                        except KeyError:
+                            print(f"KeyError {scenario} {file} {block}")
+                            exit(-1)   
+                        diff = 0 
 
-                    if self.typeEvaluation == TypeEvaluation.JUST_SEND:
-                        diff= x2 - x1
-                    elif self.typeEvaluation == TypeEvaluation.JUST_COMUNICATION:
-                        diff= (x3 - x1)
-                    else:
-                        diff= (x4 - x3 ) + ( x2 - x1)
-                                       
-                    if diff <= 0:
-                         print(f"Diff is zero or negative: {diff} for {scenario} {file} {block}")        
-                         continue              
-                    else:
-                        self.diffs.append(diff)  
-                        self.sizes.append(size)
-                        self.bandwidths.append( ( size * 8 / 1000000000 ) / diff )
-                    #if x1 < self.limit:
-                    #    plt.scatter(x1*scale,scenario+1, color=self.random_color(file),s=1)
-                    #plt.plot([x1*scale,x2*scale],[scenario+1,scenario+1], color=self.random_color(file),marker="o",markersize=1)
-                    #plt.plot([x1*scale,x2*scale],[scenario+1,scenario+1], color=self.random_color(file),linewidth=1) 
-          
-        # as 2 contagens nao sao relevantes, porque os buffers tem tamanhos diferentes.            
+                        if self.typeEvaluation == TypeEvaluation.JUST_SEND or self.typeEvaluation == TypeEvaluation.JUST_REMOTE_SEND:
+                            diff= x2 - x1
+                        elif self.typeEvaluation == TypeEvaluation.JUST_COMUNICATION:
+                            diff= (x3 - x1)
+                        else:
+                            diff= (x4 - x3 ) + ( x2 - x1)
+                                        
+                        if diff <= 0:
+                            print(f"Diff is zero or negative: {diff} for {scenario} {file} {block}")        
+                            continue              
+                        else:
+                            self.diffs.append(diff)  
+                            self.sizes.append(size / 1000000)  # Convert to MB
+                            self.bandwidths.append( ( size * 8 / 1000000000 ) / diff )
+                        #if x1 < self.limit:
+                        #    plt.scatter(x1*scale,scenario+1, color=self.random_color(file),s=1)
+                        #plt.plot([x1*scale,x2*scale],[scenario+1,scenario+1], color=self.random_color(file),marker="o",markersize=1)
+                        #plt.plot([x1*scale,x2*scale],[scenario+1,scenario+1], color=self.random_color(file),linewidth=1) 
+            
+            # as 2 contagens nao sao relevantes, porque os buffers tem tamanhos diferentes.            
         avg_time_per_buffer= statistics.mean(self.diffs)
         stdev_time_per_buffer = statistics.stdev(self.diffs)
         max_time_per_buffer = max(self.diffs)
@@ -209,8 +216,8 @@ class MyPlot(object):
         print(f'Avg Simulation per Process(s): {avg_simulation}') 
         print(f'StdDev Simulation per Process(s): {stdev_simulation}') 
 
-        avg_size = statistics.mean(self.sizes) / 1000000
-        total_size_per_nodes = sum(self.sizes) / 1000000000 / self.number_nodes
+        avg_size = statistics.mean(self.sizes)
+        total_size_per_nodes = sum(self.sizes) / 1000 / self.number_nodes
         print(f'AVG size buffer (MB): {avg_size:.2f}') 
         print(f'Total size per node (GB): {total_size_per_nodes:.2f}') 
 
@@ -219,15 +226,13 @@ class MyPlot(object):
         print(f'AVG Bandwidth (Gb/s): {avg_bandwidth:.2f}') 
         print(f'Stdev Bandwidth (Gb/s): {stddev_bandwidth:.2f}')
 
-        self.escreveCsv({ 'Nodes': self.number_nodes, 
-                         'Avg_Simulation':  avg_simulation , 'Stdev_simulation': stdev_simulation,
-                         'Avg_time_per_process': avg_per_process, 'Stdev_time_per_process': stdev_time_per_buffer,
-                         'Avg_bandwidth': avg_bandwidth, 'Stddev_bandwidth': stddev_bandwidth }   )
-        
-        #plt.xlim(0, max) 
-        # if self.limit != -1:
-        #     plt.show()
-
+        if escrever_csv:
+            print("Writing CSV file...")
+            self.escreveCsv({ 'Nodes': self.number_nodes, 
+                             'Avg_Simulation': avg_simulation , 'Stdev_simulation': stdev_simulation,
+                             'Avg_time_per_process': avg_per_process, 'Stdev_time_per_process': stdev_time_per_buffer,
+                             'Avg_bandwidth': avg_bandwidth, 'Stddev_bandwidth': stddev_bandwidth }   )        
+            
     def plotBandwidth(self,base_directory,plotLabel):
         
         df_csv = pd.read_csv(os.path.join(base_directory,"../plot.csv"),index_col='Nodes')
@@ -280,6 +285,16 @@ class MyPlot(object):
         plt.title(f'tempo de simulação médio (s) no {plotLabel} com desvio padrão.')
         plt.grid(True, axis='y', linestyle='--', alpha=0.5)
         plt.tight_layout()       
+        plt.show()
+    
+    def PlotHistogram(self):
+        plt.figure(figsize=(8,5))
+        plt.hist(self.sizes, bins=50, color='blue', alpha=0.7, edgecolor='black')
+        plt.title('Histograma Tamanho arquivos')
+        plt.xlabel('Tamanho (MB)')
+        plt.ylabel('Frequência')
+        plt.grid(axis='y', linestyle='--', alpha=0.7)
+        plt.tight_layout()
         plt.show()
 
     def escreveCsv(self,linha):
