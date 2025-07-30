@@ -207,9 +207,9 @@ class MyPlot(object):
         avg_simulation = statistics.mean(self.Simulations)
         stdev_simulation  = statistics.stdev(self.Simulations)
         print(f'Number Buffers: {count_buffer}')                
-        print(f'AVG per Buffers: {avg_time_per_buffer:.2e}')        
-        print(f'Stdev per Buffers: {stdev_time_per_buffer:.2e}')  
-        print(f'Max per Buffers: {max_time_per_buffer:.2e}') 
+        print(f'AVG per Buffers: {avg_time_per_buffer}')        
+        print(f'Stdev per Buffers: {stdev_time_per_buffer}')  
+        print(f'Max per Buffers: {max_time_per_buffer}') 
 
         avg_per_process = sum_time/self.number_scenarios
         print(f'Avg Comunication per Process(s): {avg_per_process}') 
@@ -230,64 +230,111 @@ class MyPlot(object):
             print("Writing CSV file...")
             self.escreveCsv({ 'Nodes': self.number_nodes, 
                              'Avg_Simulation': avg_simulation , 'Stdev_simulation': stdev_simulation,
-                             'Avg_time_per_process': avg_per_process, 'Stdev_time_per_process': stdev_time_per_buffer,
-                             'Avg_bandwidth': avg_bandwidth, 'Stddev_bandwidth': stddev_bandwidth }   )        
+                             'Avg_comunication_time_per_process': avg_per_process, 
+                             'Avg_time_per_buffer': avg_time_per_buffer ,'Stdev_time_per_buffer': stdev_time_per_buffer,
+                             'Avg_bandwidth': avg_bandwidth, 'Stddev_bandwidth': stddev_bandwidth }   )  
+            
+   
+    def escreveCsv(self,linha):
+        path_csv = os.path.join(self.base_directory,"../plot.csv")
+        cabecalho = ['Nodes', 
+                     'Avg_Simulation', 'Stdev_simulation',
+                     'Avg_comunication_time_per_process',
+                     "Avg_time_per_buffer",'Stdev_time_per_buffer', 
+                     "Avg_bandwidth", "Stddev_bandwidth"]
+        escrever_cabecalho = not os.path.exists(path_csv) or os.path.getsize(path_csv) == 0
+        with open(path_csv,mode='a',newline='',encoding='utf-8') as arquivo_csv:
+            writer = csv.DictWriter(arquivo_csv, fieldnames=cabecalho)
+            if escrever_cabecalho:
+                writer.writeheader()
+            writer.writerow(linha)
+            arquivo_csv.close()      
             
     def plotBandwidth(self,base_directory,plotLabel):
         
         df_csv = pd.read_csv(os.path.join(base_directory,"../plot.csv"),index_col='Nodes')
         df_len = len(df_csv)
         X = np.zeros(df_len)
-        categorias = [ "2 Nodes", "4 Nodes", "8 Nodes", "16 Nodes"]
+        categorias =  np.empty(df_len, dtype=object)
         avgBandwidth = np.zeros(df_len)
         stdDevBandwidth = np.zeros(df_len)
         
         for i in range(len(df_csv)):
             X[i]= i
+            categorias[i]= f"{df_csv.index[i]} Nodes"
             avgBandwidth[i]= df_csv.iloc[i]['Avg_bandwidth']
             stdDevBandwidth[i]= df_csv.iloc[i]['Stddev_bandwidth']
         # Plotando com barras de erro vindas da outra série
         plt.figure(figsize=(8,5))      
-        plt.bar(X, avgBandwidth, yerr=stdDevBandwidth, capsize=8, color='lightgreen', edgecolor='black') 
+        plt.bar(X, avgBandwidth, yerr=stdDevBandwidth, label="Banda Gb/s", capsize=8, color='lightgreen', edgecolor='black') 
 
         plt.xticks(X, categorias)
         plt.ylabel('Banda Média')
         plt.title(f'Banda média por envio de buffer no {plotLabel} com erro padrão')
         plt.grid(True, axis='y', linestyle='--', alpha=0.5)
-        plt.tight_layout()       
+        plt.tight_layout()     
+        plt.legend()  
         plt.show()
 
+    def plotLatency(self,base_directory,plotLabel):
+        
+        df_csv = pd.read_csv(os.path.join(base_directory,"../plot.csv"),index_col='Nodes')
+        df_len = len(df_csv)
+        X = np.zeros(df_len)
+        categorias =  np.empty(df_len, dtype=object)
+        avg_time_per_buffer = np.zeros(df_len)
+        stdev_time_per_buffer = np.zeros(df_len)
+        
+        for i in range(len(df_csv)):
+            X[i]= i
+            categorias[i]= f"{df_csv.index[i]} Nodes"
+            avg_time_per_buffer[i]= df_csv.iloc[i]['Avg_time_per_buffer']
+            stdev_time_per_buffer[i]= df_csv.iloc[i]['Stdev_time_per_buffer']
+        # Plotando com barras de erro vindas da outra série
+        plt.figure(figsize=(8,5))      
+        plt.bar(X, avg_time_per_buffer, yerr=stdev_time_per_buffer, label="Latencia (s)", capsize=8, color='lightgreen', edgecolor='black') 
 
+        plt.xticks(X, categorias)
+        plt.ylabel('Latencia Média')
+        plt.title(f'Latencia Média do envio do buffer no {plotLabel} com erro padrão')
+        plt.grid(True, axis='y', linestyle='--', alpha=0.5)
+        plt.tight_layout()     
+        plt.legend()  
+        plt.show()
 
     def plotExecutionTime(self,base_directory,plotLabel):
         
         df_csv = pd.read_csv(os.path.join(base_directory,"../plot.csv"),index_col='Nodes')
         df_len = len(df_csv)
         X = np.zeros(df_len)
-        largura = 0.25
-        categorias = [ "2 Nodes", "4 Nodes", "8 Nodes", "16 Nodes"]
-        avgBandwidth = np.zeros(df_len)
+        largura = 0.25        
+        categorias =  np.empty(df_len, dtype=object)
+        AvgSimulation = np.zeros(df_len)
         Stdev_simulation = np.zeros(df_len)
         Avg_time_per_process = np.zeros(df_len)
         
         for i in range(len(df_csv)):
             X[i]= i
-            avgBandwidth[i]= df_csv.iloc[i]['Avg_Simulation']
+            categorias[i]= f"{df_csv.index[i]} Nodes"
+            AvgSimulation[i]= df_csv.iloc[i]['Avg_Simulation']
             Stdev_simulation[i]= df_csv.iloc[i]['Stdev_simulation']
-            Avg_time_per_process[i]= df_csv.iloc[i]['Avg_time_per_process']
+            Avg_time_per_process[i]= df_csv.iloc[i]['Avg_comunication_time_per_process']
+        
         # Plotando com barras de erro vindas da outra série
         plt.figure(figsize=(8,5))      
-        plt.bar(X - largura/2, avgBandwidth, yerr=Stdev_simulation, width=largura, color='lightgreen', edgecolor='black') 
-        plt.bar(X + largura/2, Avg_time_per_process, width=largura, color='blue', edgecolor='black') 
+        plt.bar(X , AvgSimulation, yerr=Stdev_simulation, label="Computação", width=largura, color='lightgreen', edgecolor='black') 
+        plt.bar(X , Avg_time_per_process, bottom=AvgSimulation, label="Comunicação", width=largura, color='blue', edgecolor='black') 
 
         plt.xticks(X, categorias)
         plt.ylabel('tempo de simulação médio (s)')
         plt.title(f'tempo de simulação médio (s) no {plotLabel} com desvio padrão.')
         plt.grid(True, axis='y', linestyle='--', alpha=0.5)
-        plt.tight_layout()       
+        plt.tight_layout()   
+        plt.legend()    
         plt.show()
     
     def PlotHistogram(self):
+
         plt.figure(figsize=(8,5))
         plt.hist(self.sizes, bins=50, color='blue', alpha=0.7, edgecolor='black')
         plt.title('Histograma Tamanho arquivos')
@@ -297,19 +344,7 @@ class MyPlot(object):
         plt.tight_layout()
         plt.show()
 
-    def escreveCsv(self,linha):
-        path_csv = os.path.join(self.base_directory,"../plot.csv")
-        cabecalho = ['Nodes', 
-                     'Avg_Simulation', 'Stdev_simulation',
-                     'Avg_time_per_process','Stdev_time_per_process', 
-                     "Avg_bandwidth", "Stddev_bandwidth"]
-        escrever_cabecalho = not os.path.exists(path_csv) or os.path.getsize(path_csv) == 0
-        with open(path_csv,mode='a',newline='',encoding='utf-8') as arquivo_csv:
-            writer = csv.DictWriter(arquivo_csv, fieldnames=cabecalho)
-            if escrever_cabecalho:
-                writer.writeheader()
-            writer.writerow(linha)
-            arquivo_csv.close()
+    
 
 
 
