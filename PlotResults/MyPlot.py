@@ -12,17 +12,18 @@ class TypeEvaluation(Enum):
     JUST_COMUNICATION = 1,
     COMUNICATION_AND_IO = 2,
     JUST_SEND = 3,
-    JUST_REMOTE_SEND = 4,
+   
 
     
 class MyPlot(object):
     """description of class"""
 
 
-    def __init__(self, base_directory,number_nodes, number_scenarios_per_node, number_scenarios, typeEvaluation= TypeEvaluation.JUST_COMUNICATION,  limit=-1):
+    def __init__(self, base_directory,number_nodes, number_scenarios_per_node, number_scenarios, typeEvaluation= TypeEvaluation.JUST_COMUNICATION, onlyRemote=True, limit=-1):
         self.number_nodes = number_nodes 
         self.number_scenarios_per_nodes = number_scenarios_per_node
         self.number_scenarios =  number_scenarios
+        self.onlyRemote = onlyRemote
                 
         self.base_directory = base_directory
         self.limit=limit
@@ -42,6 +43,7 @@ class MyPlot(object):
         self.numberBuffers=0
         self.start_moment=1000000000000000
         self.typeEvaluation= typeEvaluation
+        self.dicionarioScenarios={}
 
     def random_color(self,k):
         if k not in self.colors:
@@ -51,8 +53,7 @@ class MyPlot(object):
     def load_data(self):
         
         if ( not self.typeEvaluation == TypeEvaluation.JUST_COMUNICATION 
-        and not self.typeEvaluation == TypeEvaluation.COMUNICATION_AND_IO
-        and not self.typeEvaluation == TypeEvaluation.JUST_REMOTE_SEND
+        and not self.typeEvaluation == TypeEvaluation.COMUNICATION_AND_IO        
         and not self.typeEvaluation == TypeEvaluation.JUST_SEND):          
             raise Exception("Bad configuration.")
         
@@ -80,7 +81,7 @@ class MyPlot(object):
                 time2 = df.iloc[k,6]
                 size = df.iloc[k,8]
                 
-                if self.typeEvaluation == TypeEvaluation.JUST_REMOTE_SEND and i < self.number_scenarios_per_nodes:
+                if self.onlyRemote and i < self.number_scenarios_per_nodes:
                     if scenario not in self.localScenarios:
                         self.localScenarios.append(scenario)                       
                 if file in self.X1[scenario]:
@@ -89,11 +90,14 @@ class MyPlot(object):
                     else: 
                         self.X1[scenario][file][seq]=  ( time , size )                       
                         self.X2[scenario][file][seq]= ( time2 , size )  
+                        self.dicionarioScenarios[(i+1,seq)]= (scenario,file)
                 else:
                     self.X1[scenario][file]={}
                     self.X1[scenario][file][seq]= ( time , size )                   
                     self.X2[scenario][file]={}
                     self.X2[scenario][file][seq]= ( time2 , size ) 
+                    self.dicionarioScenarios[(i+1,seq)]= (scenario,file)
+
 
             
             self.df_times= pd.read_csv(os.path.join(self.base_directory ,f"sddptimer{sufix:04d}.log"),header=None)
@@ -101,35 +105,35 @@ class MyPlot(object):
                 if  self.df_times.iloc[k,0] == "Simulation":
                     self.Simulations.append(float(self.df_times.iloc[k,1]))  
 
-        # self.df_master=pd.read_csv(os.path.join(self.base_directory ,f"mpiio-master.log"),header=None)    
-        # for k in range(len(self.df_master)):
-        #     if self.df_master.iloc[k].count() >= 8:
-        #         time = self.df_master.iloc[k,7]
-        #     else:
-        #         raise Exception("Bad formatted file.")
+        self.df_master=pd.read_csv(os.path.join(self.base_directory ,f"mpiio-master.log"),header=None)    
+        for k in range(len(self.df_master)):           
 
-        #     scenario = self.df_master.iloc[k,0]-1
-        #     file = self.df_master.iloc[k,1]
-        #     block= self.df_master.iloc[k,2]
-        #     time = self.df_master.iloc[k,4] 
-        #     time2= self.df_master.iloc[k,7]
-            
-        #     if scenario < self.number_scenarios:
-        #         try:
-        #             if self.X1[scenario][file][block]:
-        #                 if file in self.X3[scenario]:
-        #                     if block in self.X3[scenario][file] and self.X3[scenario][file][block] > time:
-        #                         continue
-        #                     else: 
-        #                         self.X3[scenario][file][block]=  time     
-        #                         self.X4[scenario][file][block]=  time2
-        #                 else:
-        #                     self.X3[scenario][file]={}
-        #                     self.X3[scenario][file][block]= time
-        #                     self.X4[scenario][file]={}
-        #                     self.X4[scenario][file][block]= time2
-        #         except KeyError:
-        #             continue   
+            cpu = self.df_master.iloc[k,0]
+            seq = self.df_master.iloc[k,1]           
+            time = self.df_master.iloc[k,2] 
+            time2= self.df_master.iloc[k,6]
+           
+            try:
+                scenario = self.dicionarioScenarios.get((cpu,seq))[0]
+                file = self.dicionarioScenarios.get((cpu,seq))[1] 
+                if self.X1[scenario][file][seq]:
+                    if file in self.X3[scenario]:
+                        if seq in self.X3[scenario][file] and self.X3[scenario][file][seq] > time:
+                            continue
+                        else: 
+                            self.X3[scenario][file][seq]=  time     
+                            self.X4[scenario][file][seq]=  time2
+                    else:
+                        self.X3[scenario][file]={}
+                        self.X3[scenario][file][seq]= time
+                        self.X4[scenario][file]={}
+                        self.X4[scenario][file][seq]= time2
+            except KeyError:
+                print(f"KeyError {scenario} {file} {seq}")
+                continue   
+            except TypeError:
+                print(f"TypeError {scenario} {file} {seq}")
+                continue
        
 
     def show_config(self):
@@ -172,14 +176,14 @@ class MyPlot(object):
                         size = self.X1[scenario][file][block][1]
                         try:                    
                             x2 = ( self.X2[scenario][file][block][0] - self.start_moment )  
-                            x3 = None #( self.X3[scenario][file][block] - self.start_moment )
-                            x4 = None#( self.X4[scenario][file][block] - self.start_moment )
+                            x3 = ( self.X3[scenario][file][block] - self.start_moment )
+                            x4 = ( self.X4[scenario][file][block] - self.start_moment )
                         except KeyError:
                             print(f"KeyError {scenario} {file} {block}")
                             exit(-1)   
                         diff = 0 
 
-                        if self.typeEvaluation == TypeEvaluation.JUST_SEND or self.typeEvaluation == TypeEvaluation.JUST_REMOTE_SEND:
+                        if self.typeEvaluation == TypeEvaluation.JUST_SEND:
                             diff= x2 - x1
                         elif self.typeEvaluation == TypeEvaluation.JUST_COMUNICATION:
                             diff= (x3 - x1)
@@ -295,8 +299,8 @@ class MyPlot(object):
         plt.bar(X, avg_time_per_buffer, yerr=stdev_time_per_buffer, label="Latencia (s)", capsize=8, color='lightgreen', edgecolor='black') 
 
         plt.xticks(X, categorias)
-        plt.ylabel('Latencia Média')
-        plt.title(f'Latencia Média do envio do buffer no {plotLabel} com erro padrão')
+        plt.ylabel('Latencia média')
+        plt.title(f'Latencia Média de envio do buffer no {plotLabel} com erro padrão')
         plt.grid(True, axis='y', linestyle='--', alpha=0.5)
         plt.tight_layout()     
         plt.legend()  
