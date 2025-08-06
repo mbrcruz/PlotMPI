@@ -129,10 +129,10 @@ class MyPlot(object):
                         self.X4[scenario][file]={}
                         self.X4[scenario][file][seq]= time2
             except KeyError:
-                print(f"KeyError {scenario} {file} {seq}")
+                #print(f"KeyError {scenario} {file} {seq}")
                 continue   
             except TypeError:
-                print(f"TypeError {scenario} {file} {seq}")
+                #print(f"TypeError {scenario} {file} {seq}")
                 continue
        
 
@@ -215,7 +215,9 @@ class MyPlot(object):
         print(f'Stdev per Buffers: {stdev_time_per_buffer}')  
         print(f'Max per Buffers: {max_time_per_buffer}') 
 
-        avg_per_process = sum_time/self.number_scenarios
+        #Calcula o tempo medio de cada cenario e depois multiplica pelo numero de cenario executado por processo.
+        avg_per_process = ( sum_time/ (self.number_nodes * self.number_scenarios_per_nodes) )
+        # Average time per process)
         print(f'Avg Comunication per Process(s): {avg_per_process}') 
         print(f'Avg Simulation per Process(s): {avg_simulation}') 
         print(f'StdDev Simulation per Process(s): {stdev_simulation}') 
@@ -320,14 +322,16 @@ class MyPlot(object):
         for i in range(len(df_csv)):
             X[i]= i
             categorias[i]= f"{df_csv.index[i]} Nodes"
-            AvgSimulation[i]= df_csv.iloc[i]['Avg_Simulation']
+            AvgSimulation_total= df_csv.iloc[i]['Avg_Simulation']            
             Stdev_simulation[i]= df_csv.iloc[i]['Stdev_simulation']
             Avg_time_per_process[i]= df_csv.iloc[i]['Avg_comunication_time_per_process']
+            AvgSimulation[i]= AvgSimulation_total - Avg_time_per_process[i]
         
         # Plotando com barras de erro vindas da outra série
         plt.figure(figsize=(8,5))      
         plt.bar(X , AvgSimulation, yerr=Stdev_simulation, label="Computação", width=largura, color='lightgreen', edgecolor='black') 
         plt.bar(X , Avg_time_per_process, bottom=AvgSimulation, label="Comunicação", width=largura, color='blue', edgecolor='black') 
+        #plt.bar(X , Avg_time_per_process, label="Comunicação", width=largura, color='blue', edgecolor='black') 
 
         plt.xticks(X, categorias)
         plt.ylabel('tempo de simulação médio (s)')
