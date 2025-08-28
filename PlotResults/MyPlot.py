@@ -37,9 +37,10 @@ class MyPlot(object):
         self.Simulations=[]
         self.localScenarios=[]      
 
-        self.diffs=[]
+        self.diffs={}
+        self.sizesPerScenario={}
         self.sizes=[]
-        self.bandwidths=[]
+        self.bandwidths={}
         self.numberBuffers=0
         self.start_moment=1000000000000000
         self.typeEvaluation= typeEvaluation
@@ -162,6 +163,12 @@ class MyPlot(object):
         #max= 0
         ind= 0
         self.start_moment = 0
+        self.diffs={}
+        self.sizesPerScenario={}
+        self.bandwidths={}
+        count_buffer=0
+
+        first_scenario = 0
         for i in range(self.number_scenarios):    
             scenario = i+1        
             print( f"Ploting scenario {scenario} ...")
@@ -170,6 +177,8 @@ class MyPlot(object):
             if scenario in self.localScenarios:              
                 continue
             else:
+                if first_scenario == 0:
+                    first_scenario = i
                 for file in self.X1[scenario]:
                     for block in self.X1[scenario][file]:               
                         x1 = ( self.X1[scenario][file][block][0] - self.start_moment )  
@@ -178,6 +187,7 @@ class MyPlot(object):
                             x2 = ( self.X2[scenario][file][block][0] - self.start_moment )  
                             x3 = ( self.X3[scenario][file][block] - self.start_moment )
                             x4 = ( self.X4[scenario][file][block] - self.start_moment )
+                            count_buffer+= 1
                         except KeyError:
                             print(f"KeyError {scenario} {file} {block}")
                             exit(-1)   
@@ -194,50 +204,57 @@ class MyPlot(object):
                             print(f"Diff is zero or negative: {diff} for {scenario} {file} {block}")        
                             continue              
                         else:
-                            self.diffs.append(diff)  
-                            self.sizes.append(size / 1000000)  # Convert to MB
-                            self.bandwidths.append( ( size * 8 / 1000000000 ) / diff )
+                            if i in self.diffs:
+                                self.diffs[i]=  self.diffs[i] + diff  
+                                self.sizesPerScenario[i]=  self.sizesPerScenario[i] +  size                               
+                            else:
+                                self.diffs[i]=  diff  
+                                self.sizesPerScenario[i]=  size 
+                            if i == first_scenario:      
+                                self.sizes.append(size /1000000) # em MB                                   
                         #if x1 < self.limit:
                         #    plt.scatter(x1*scale,scenario+1, color=self.random_color(file),s=1)
                         #plt.plot([x1*scale,x2*scale],[scenario+1,scenario+1], color=self.random_color(file),marker="o",markersize=1)
                         #plt.plot([x1*scale,x2*scale],[scenario+1,scenario+1], color=self.random_color(file),linewidth=1) 
             
-            # as 2 contagens nao sao relevantes, porque os buffers tem tamanhos diferentes.            
-        avg_time_per_buffer= statistics.mean(self.diffs)
-        stdev_time_per_buffer = statistics.stdev(self.diffs)
-        max_time_per_buffer = max(self.diffs)
-        sum_time= sum(self.diffs)
-        count_buffer= len(self.diffs)
+        # as 2 contagens nao sao relevantes, porque os buffers tem tamanhos diferentes.            
+        avg_time_per_scenario= statistics.mean(self.diffs.values())
+        stdev_time_per_scenario = statistics.stdev(self.diffs.values())
+        max_time_per_scenario = max(self.diffs.values())
+        sum_time= sum(self.diffs.values())
+       
         avg_simulation = statistics.mean(self.Simulations)
         stdev_simulation  = statistics.stdev(self.Simulations)
         print(f'Number Buffers: {count_buffer}')                
-        print(f'AVG per Buffers: {avg_time_per_buffer}')        
-        print(f'Stdev per Buffers: {stdev_time_per_buffer}')  
-        print(f'Max per Buffers: {max_time_per_buffer}') 
+        print(f'AVG per Scenarios: {avg_time_per_scenario}')        
+        print(f'Stdev per Scenarios: {stdev_time_per_scenario}')  
+        print(f'Max per Scenarios: {max_time_per_scenario}') 
 
         #Calcula o tempo medio de cada cenario e depois multiplica pelo numero de cenario executado por processo.
-        avg_per_process = ( sum_time/ (self.number_nodes * self.number_scenarios_per_nodes) )
+        avg_per_process = ( sum_time/ ( ( self.number_nodes - 1) * self.number_scenarios_per_nodes) )
         # Average time per process)
         print(f'Avg Comunication per Process(s): {avg_per_process}') 
         print(f'Avg Simulation per Process(s): {avg_simulation}') 
         print(f'StdDev Simulation per Process(s): {stdev_simulation}') 
 
-        avg_size = statistics.mean(self.sizes)
-        total_size_per_nodes = sum(self.sizes) / 1000 / self.number_nodes
-        print(f'AVG size buffer (MB): {avg_size:.2f}') 
+        avg_size = statistics.mean(self.sizesPerScenario.values()) / 1000000
+        total_size_per_nodes = statistics.mean(self.sizesPerScenario.values()) * self.number_scenarios_per_nodes/ 1000000000
+        print(f'AVG size Scenario (MB): {avg_size:.2f}') 
         print(f'Total size per node (GB): {total_size_per_nodes:.2f}') 
 
-        avg_bandwidth = statistics.mean(self.bandwidths)
-        stddev_bandwidth = statistics.stdev(self.bandwidths)
-        print(f'AVG Bandwidth (Gb/s): {avg_bandwidth:.2f}') 
-        print(f'Stdev Bandwidth (Gb/s): {stddev_bandwidth:.2f}')
+        for i in self.diffs.keys():
+            self.bandwidths[i]=   ( self.sizesPerScenario[i] * 8 / 1000000000 ) / self.diffs[i]
+        avg_bandwidth = statistics.mean(self.bandwidths.values())
+        stddev_bandwidth = statistics.stdev(self.bandwidths.values())
+        print(f'AVG Bandwidth per scenario (Gb/s): {avg_bandwidth:.2f}') 
+        print(f'Stdev Bandwidth per scenario (Gb/s): {stddev_bandwidth:.2f}')
 
         if escrever_csv:
             print("Writing CSV file...")
             self.escreveCsv({ 'Nodes': self.number_nodes, 
                              'Avg_Simulation': avg_simulation , 'Stdev_simulation': stdev_simulation,
                              'Avg_comunication_time_per_process': avg_per_process, 
-                             'Avg_time_per_buffer': avg_time_per_buffer ,'Stdev_time_per_buffer': stdev_time_per_buffer,
+                             'Avg_time_per_scenario': avg_time_per_scenario ,'Stdev_time_per_scenario': stdev_time_per_scenario,
                              'Avg_bandwidth': avg_bandwidth, 'Stddev_bandwidth': stddev_bandwidth }   )  
             
    
@@ -246,7 +263,7 @@ class MyPlot(object):
         cabecalho = ['Nodes', 
                      'Avg_Simulation', 'Stdev_simulation',
                      'Avg_comunication_time_per_process',
-                     "Avg_time_per_buffer",'Stdev_time_per_buffer', 
+                     "Avg_time_per_scenario",'Stdev_time_per_scenario', 
                      "Avg_bandwidth", "Stddev_bandwidth"]
         escrever_cabecalho = not os.path.exists(path_csv) or os.path.getsize(path_csv) == 0
         with open(path_csv,mode='a',newline='',encoding='utf-8') as arquivo_csv:
@@ -294,8 +311,8 @@ class MyPlot(object):
         for i in range(len(df_csv)):
             X[i]= i
             categorias[i]= f"{df_csv.index[i]} Nodes"
-            avg_time_per_buffer[i]= df_csv.iloc[i]['Avg_time_per_buffer']
-            stdev_time_per_buffer[i]= df_csv.iloc[i]['Stdev_time_per_buffer']
+            avg_time_per_buffer[i]= df_csv.iloc[i]['Avg_time_per_scenario']
+            stdev_time_per_buffer[i]= df_csv.iloc[i]['Stdev_time_per_scenario']
         # Plotando com barras de erro vindas da outra série
         plt.figure(figsize=(8,5))      
         plt.bar(X, avg_time_per_buffer, yerr=stdev_time_per_buffer, label="Latencia (s)", capsize=8, color='lightgreen', edgecolor='black') 
