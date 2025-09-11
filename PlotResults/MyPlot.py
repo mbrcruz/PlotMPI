@@ -354,8 +354,8 @@ class MyPlot(object):
         
 
         # Scatter plot
-        plt.scatter(sizes1, diffs1, color="green", label="Sem concorrencia", alpha=0.7, edgecolors='k')
-        plt.scatter(sizes2, diffs2, color="red",  label="Com concorrencia", alpha=0.7, edgecolors='k')
+        plt.scatter(sizes1, diffs1, color="green", label="Sem concorrencia", s=10, alpha=0.7, edgecolors='k')
+        plt.scatter(sizes2, diffs2, color="red",  label="Com concorrencia", s=10, alpha=0.7, edgecolors='k')
 
         plt.title("Tempo envio x tamanho do Buffer no "+ displotLabel )
         plt.xlabel("Tamanho do Buffer (MB)")
@@ -365,6 +365,7 @@ class MyPlot(object):
         plt.yscale('log')
         #plt.ticklabel_format(axis='y', style='sci')
         plt.grid(True, linestyle='--', alpha=0.5)
+        plt.legend()
         plt.show()
 
 
