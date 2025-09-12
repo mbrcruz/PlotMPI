@@ -36,13 +36,14 @@ class MyPlot(object):
         self.X2=[]
         self.X3=[]
         self.X4=[]
+        self.records=[]
         self.Simulations=[]
-        self.localScenarios=[]    
+        self.localScenarios=[]   
+        self.bestScenario=0
+        self.worstScenario=0 
 
         self.start_moment = 0       
-        self.sizesPerScenario=[]
-        self.diffs=[]      
-        self.sizes=[]
+        self.sizesPerScenario=[]     
         self.bandwidths={}
         self.numberBuffers=0
         self.start_moment=1000000000000000
@@ -207,54 +208,62 @@ class MyPlot(object):
                         else:                  
                             # The following elifs were empty and are removed for clarity
                             # If you want to add logic for sizeMB ranges, add code here
-                            if filter_scenario == 0 or scenario == filter_scenario:                        
-                                self.diffs.append(diff)
-                                self.sizes.append(size /1000000)
-                                                                 
+                            if filter_scenario == 0 or scenario == filter_scenario:     
+                                record= { "scenario": scenario, 'file': file, 'block': block, 'sizeMB': size /1000000 , 'timeSec': diff }   
+                                self.records.append(record)                  
                         #if x1 < self.limit:
                         #    plt.scatter(x1*scale,scenario+1, color=self.random_color(file),s=1)
                         #plt.plot([x1*scale,x2*scale],[scenario+1,scenario+1], color=self.random_color(file),marker="o",markersize=1)
-                        #plt.plot([x1*scale,x2*scale],[scenario+1,scenario+1], color=self.random_color(file),linewidth=1) 
+                        #plt.plot([x1*scale,x2*scale],[scenario+1,scenario+1], color=self.random_color(file),linewidth=1)
+        if escrever_csv:
+             # as 2 contagens nao sao relevantes, porque os buffers tem tamanhos diferentes.
+            df= pd.DataFrame(self.records)
+            sum_scenarios= df.groupby("scenario")["timeSec"].sum()
+            avg_time_per_scenario=  sum_scenarios.mean()
+            stdev_time_per_scenario = sum_scenarios.std()
+
+            self.worstScenario= sum_scenarios.idxmax()
+            self.bestScenario= sum_scenarios.idxmin()
+            max_time_per_scenario = sum_scenarios.max()
+            min_time_per_scenario = sum_scenarios.min()      
             
-        # as 2 contagens nao sao relevantes, porque os buffers tem tamanhos diferentes.
-        avg_time_per_scenario= np.mean(self.diffs)
-        stdev_time_per_scenario = np.std(self.diffs)
-        max_time_per_scenario = max(self.diffs)
-        sum_time= sum(self.diffs)
-       
-        avg_simulation = statistics.mean(self.Simulations)
-        stdev_simulation  = statistics.stdev(self.Simulations)
-        #print(f'Number Buffers: {count_buffer}')                
-        print(f'AVG per Scenarios: {avg_time_per_scenario}')        
-        print(f'Stdev per Scenarios: {stdev_time_per_scenario}')  
-        print(f'Max per Scenarios: {max_time_per_scenario}') 
+        
+            avg_simulation = statistics.mean(self.Simulations)
+            stdev_simulation  = statistics.stdev(self.Simulations)
+            print(f'Number Buffers: {self.records.count}')                
+            print(f'AVG per Scenarios: {avg_time_per_scenario}')        
+            print(f'Stdev per Scenarios: {stdev_time_per_scenario}')  
+            print(f'Max per Scenarios: {self.worstScenario} {max_time_per_scenario}') 
+            print(f'Min per Scenarios: {self.bestScenario} {min_time_per_scenario}') 
 
-        #Calcula o tempo medio de cada cenario e depois multiplica pelo numero de cenario executado por processo.
-        # avg_per_process = ( sum_time/ ( ( self.number_nodes - 1) * self.number_scenarios_per_nodes) )
-        # # Average time per process)
-        # print(f'Avg Comunication per Process(s): {avg_per_process}') 
-        # print(f'Avg Simulation per Process(s): {avg_simulation}') 
-        # print(f'StdDev Simulation per Process(s): {stdev_simulation}') 
 
-        # avg_size = statistics.mean(self.sizesPerScenario.values()) / 1000000
-        # total_size_per_nodes = statistics.mean(self.sizesPerScenario.values()) * self.number_scenarios_per_nodes/ 1000000000
-        # print(f'AVG size Scenario (MB): {avg_size:.2f}') 
-        # print(f'Total size per node (GB): {total_size_per_nodes:.2f}') 
+            #sum_time= sum(self.diffs)
+            #Calcula o tempo medio de cada cenario e depois multiplica pelo numero de cenario executado por processo.
+            avg_per_process = ( avg_time_per_scenario * self.number_scenarios/ ( ( self.number_nodes - 1) * self.number_scenarios_per_nodes) )
+            # # Average time per process)
+            print(f'Avg Comunication per Process(s): {avg_per_process}') 
+            print(f'Avg Simulation per Process(s): {avg_simulation}') 
+            print(f'StdDev Simulation per Process(s): {stdev_simulation}') 
 
-        # for i in self.diffs.keys():
-        #     self.bandwidths[i]=   ( self.sizesPerScenario[i] * 8 / 1000000000 ) / self.diffs[i]
-        # avg_bandwidth = statistics.mean(self.bandwidths.values())
-        # stddev_bandwidth = statistics.stdev(self.bandwidths.values())
-        # print(f'AVG Bandwidth per scenario (Gb/s): {avg_bandwidth:.2f}') 
-        # print(f'Stdev Bandwidth per scenario (Gb/s): {stddev_bandwidth:.2f}')
+            
 
-        # if escrever_csv:
-        #     print("Writing CSV file...")
-        #     self.escreveCsv({ 'Nodes': self.number_nodes, 
-        #                      'Avg_Simulation': avg_simulation , 'Stdev_simulation': stdev_simulation,
-        #                      'Avg_comunication_time_per_process': avg_per_process, 
-        #                      'Avg_time_per_scenario': avg_time_per_scenario ,'Stdev_time_per_scenario': stdev_time_per_scenario,
-        #                      'Avg_bandwidth': avg_bandwidth, 'Stddev_bandwidth': stddev_bandwidth }   )  
+            agrupados = df.groupby("scenario")[["sizeMB","timeSec"]].sum()
+            bandwidth_per_scenario = ( agrupados["sizeMB"] * 8 / 1000 ) / agrupados["timeSec"]  # em Gb/s
+            avg_bandwidth = bandwidth_per_scenario.mean()
+            stddev_bandwidth = bandwidth_per_scenario.std()
+            # total_size_per_nodes = statistics.mean(self.sizesPerScenario.values()) * self.number_scenarios_per_nodes/ 1000000000
+            # print(f'AVG size Scenario (MB): {avg_size:.2f}') 
+            # print(f'Total size per node (GB): {total_size_per_nodes:.2f}') 
+            print(f'AVG Bandwidth per scenario (Gb/s): {avg_bandwidth:.2f}') 
+            print(f'Stdev Bandwidth per scenario (Gb/s): {stddev_bandwidth:.2f}')
+            print("Writing CSV file...")
+            self.escreveCsv({ 'Nodes': self.number_nodes, 
+                             'Avg_Simulation': avg_simulation , 'Stdev_simulation': stdev_simulation,
+                             'Avg_comunication_time_per_process': avg_per_process, 
+                             'Avg_time_per_scenario': avg_time_per_scenario ,'Stdev_time_per_scenario': stdev_time_per_scenario,
+                             'Avg_bandwidth': avg_bandwidth, 'Stddev_bandwidth': stddev_bandwidth,
+                             'worstScenario': self.worstScenario, 'max_time_per_scenario': max_time_per_scenario,
+                             'bestScenario': self.bestScenario, 'min_time_per_scenario': min_time_per_scenario } )  
             
    
     def escreveCsv(self,linha):
@@ -262,8 +271,10 @@ class MyPlot(object):
         cabecalho = ['Nodes', 
                      'Avg_Simulation', 'Stdev_simulation',
                      'Avg_comunication_time_per_process',
-                     "Avg_time_per_scenario",'Stdev_time_per_scenario', 
-                     "Avg_bandwidth", "Stddev_bandwidth"]
+                     "Avg_time_per_scenario",'Stdev_time_per_scenario',                     
+                     "Avg_bandwidth", "Stddev_bandwidth",
+                     "worstScenario", "max_time_per_scenario",
+                     "bestScenario", "min_time_per_scenario"]
         escrever_cabecalho = not os.path.exists(path_csv) or os.path.getsize(path_csv) == 0
         with open(path_csv,mode='a',newline='',encoding='utf-8') as arquivo_csv:
             writer = csv.DictWriter(arquivo_csv, fieldnames=cabecalho)
@@ -347,19 +358,32 @@ class MyPlot(object):
         plt.tight_layout()
         plt.show()
 
-    def plotScatter(self,displotLabel,diffs1, diffs2,sizes1,sizes2):
+    def plotScatter(self,displotLabel,records1, records2):
         
         plt.figure(figsize=(8,6))
 
         
+        sizes1=[]
+        diffs1=[]
 
-        # Scatter plot
-        plt.scatter(sizes1, diffs1, color="green", label="Sem concorrencia", s=10, alpha=0.7, edgecolors='k')
-        plt.scatter(sizes2, diffs2, color="red",  label="Com concorrencia", s=10, alpha=0.7, edgecolors='k')
+        for row1 in records1:
+            sizes1.append(row1['sizeMB'])
+            diffs1.append(row1['timeSec'])
+        sizes2=[]
+        diffs2=[]
+        for row2 in records2:
+            sizes2.append(row2['sizeMB'])
+            diffs2.append(row2['timeSec'])
+
+        # # Scatter plot
+        jitter_y = np.array(diffs1) + (np.random.rand(len(diffs1)) - 0.5) * 0.1  # Adiciona um pequeno jitter no eixo y
+        plt.scatter(sizes1, jitter_y, color="green", label="Sem concorrencia", s=10, alpha=0.7, edgecolors='k')
+        jitter_x = np.array(sizes2) + (np.random.rand(len(sizes2)) - 0.5)  # Adiciona um pequeno jitter no eixo x
+        plt.scatter(jitter_x, diffs2, color="red",  label="Com concorrencia", s=10, alpha=0.7, edgecolors='k')
 
         plt.title("Tempo envio x tamanho do Buffer no "+ displotLabel )
         plt.xlabel("Tamanho do Buffer (MB)")
-        plt.ylabel("Tempo de envio (µs)")
+        plt.ylabel("Tempo de envio (s)")
 
         # Escala log no eixo X ajuda a visualizar melhor (opcional)
         plt.yscale('log')
