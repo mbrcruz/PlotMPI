@@ -209,7 +209,7 @@ class MyPlot(object):
                             # The following elifs were empty and are removed for clarity
                             # If you want to add logic for sizeMB ranges, add code here
                             if filter_scenario == 0 or scenario == filter_scenario:     
-                                record= { "scenario": scenario, 'file': file, 'block': block, 'sizeMB': size /1000000 , 'timeSec': diff }   
+                                record= { "scenario": scenario, 'file': file, 'block': block, 'sizeBytes': size  , 'timeSec': diff }   
                                 self.records.append(record)                  
                         #if x1 < self.limit:
                         #    plt.scatter(x1*scale,scenario+1, color=self.random_color(file),s=1)
@@ -247,8 +247,8 @@ class MyPlot(object):
 
             
 
-            agrupados = df.groupby("scenario")[["sizeMB","timeSec"]].sum()
-            bandwidth_per_scenario = ( agrupados["sizeMB"] * 8 / 1000 ) / agrupados["timeSec"]  # em Gb/s
+            agrupados = df.groupby("scenario")[["sizeBytes","timeSec"]].sum()
+            bandwidth_per_scenario = ( agrupados["sizeBytes"] * 8 / 1000000000 ) / agrupados["timeSec"]  # em Gb/s
             avg_bandwidth = bandwidth_per_scenario.mean()
             stddev_bandwidth = bandwidth_per_scenario.std()
             # total_size_per_nodes = statistics.mean(self.sizesPerScenario.values()) * self.number_scenarios_per_nodes/ 1000000000
@@ -343,16 +343,17 @@ class MyPlot(object):
         plt.legend()    
         plt.show()
     
-    def PlotHistogram(self,max_size=100):
+    def PlotHistogram(self,max_size_kb=100000):
 
         smallSizes=[]
-        for smallSize in self.sizes:
-            if smallSize < max_size:
-                smallSizes.append(smallSize)                
+        for row in self.records:
+            smallSizesInKb= row['sizeBytes'] / 1024
+            if smallSizesInKb < max_size_kb:
+                smallSizes.append(smallSizesInKb)                
         plt.figure(figsize=(8,5))
-        plt.hist(smallSizes, bins=1000, color='blue', alpha=0.7, edgecolor='black')
+        plt.hist(smallSizes, bins=50000, color='blue', alpha=0.7, edgecolor='black')
         plt.title('Histograma Tamanho arquivos')
-        plt.xlabel('Tamanho (MB)')
+        plt.xlabel('Tamanho (KB)')
         plt.ylabel('Frequência')
         plt.grid(axis='y', linestyle='--', alpha=0.7)
         plt.tight_layout()
@@ -367,26 +368,26 @@ class MyPlot(object):
         diffs1=[]
 
         for row1 in records1:
-            sizes1.append(row1['sizeMB'])
+            sizes1.append(row1['sizeBytes'])
             diffs1.append(row1['timeSec'])
         sizes2=[]
         diffs2=[]
         for row2 in records2:
-            sizes2.append(row2['sizeMB'])
+            sizes2.append(row2['sizeBytes'])
             diffs2.append(row2['timeSec'])
 
         # # Scatter plot
-        jitter_y = np.array(diffs1) + (np.random.rand(len(diffs1)) - 0.5) * 0.1  # Adiciona um pequeno jitter no eixo y
-        plt.scatter(sizes1, jitter_y, color="green", label="Sem concorrencia", s=10, alpha=0.7, edgecolors='k')
-        jitter_x = np.array(sizes2) + (np.random.rand(len(sizes2)) - 0.5)  # Adiciona um pequeno jitter no eixo x
-        plt.scatter(jitter_x, diffs2, color="red",  label="Com concorrencia", s=10, alpha=0.7, edgecolors='k')
+        jitter_x = np.array(diffs1) + (np.random.rand(len(diffs1)) - 0.5) * 0.1  # Adiciona um pequeno jitter no eixo y
+        plt.scatter( jitter_x,sizes1, color="green", label="Sem concorrencia", s=10, alpha=0.7, edgecolors='k')
+        jitter_y = np.array(sizes2) + (np.random.rand(len(sizes2)) - 0.5)  # Adiciona um pequeno jitter no eixo x
+        plt.scatter(diffs2, jitter_y,  color="red",  label="Com concorrencia", s=10, alpha=0.7, edgecolors='k')
 
         plt.title("Tempo envio x tamanho do Buffer no "+ displotLabel )
-        plt.xlabel("Tamanho do Buffer (MB)")
-        plt.ylabel("Tempo de envio (s)")
+        plt.xlabel("Tempo de envio (s)")
+        plt.ylabel("Tamanho do Buffer (Bytes)")
 
         # Escala log no eixo X ajuda a visualizar melhor (opcional)
-        plt.yscale('log')
+        plt.xscale('log')
         #plt.ticklabel_format(axis='y', style='sci')
         plt.grid(True, linestyle='--', alpha=0.5)
         plt.legend()
