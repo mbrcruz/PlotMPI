@@ -41,6 +41,12 @@ class MyPlot(object):
         self.localScenarios=[]   
         self.bestScenario=0
         self.worstScenario=0 
+        self.categories=[10,30,40,50]
+        self.records1=[]
+        self.records2=[]
+        self.records3=[]
+        self.records4=[]
+        self.badScenarios=[]
 
         self.start_moment = 0       
         self.sizesPerScenario=[]     
@@ -202,30 +208,57 @@ class MyPlot(object):
                         else:
                             diff= (x4 - x3 ) + ( x2 - x1)
                                         
-                        if diff <= 0:
-                            print(f"Diff is zero or negative: {diff} for {scenario} {file} {block}")        
+                        if diff <= 0:                           
+                            if scenario not in self.badScenarios: 
+                                 print(f"Diff is zero or negative: {diff} for {scenario} {file} {block}")  
+                                 self.badScenarios.append(scenario)     
                             continue              
                         else:                  
                             # The following elifs were empty and are removed for clarity
                             # If you want to add logic for sizeMB ranges, add code here
                             if filter_scenario == 0 or scenario == filter_scenario:     
                                 record= { "scenario": scenario, 'file': file, 'block': block, 'sizeBytes': size  , 'timeSec': diff }   
-                                self.records.append(record)                  
+                                self.records.append(record)     
+                                if size / (1024 * 1024) < self.categories[0]:
+                                    self.records1.append(record)
+                                elif size / (1024 * 1024) < self.categories[1]: 
+                                      self.records2.append(record)   
+                                elif size / (1024 * 1024)< self.categories[2]: 
+                                      self.records3.append(record)
+                                else:
+                                      self.records4.append(record)               
+
                         #if x1 < self.limit:
                         #    plt.scatter(x1*scale,scenario+1, color=self.random_color(file),s=1)
                         #plt.plot([x1*scale,x2*scale],[scenario+1,scenario+1], color=self.random_color(file),marker="o",markersize=1)
                         #plt.plot([x1*scale,x2*scale],[scenario+1,scenario+1], color=self.random_color(file),linewidth=1)
         if escrever_csv:
              # as 2 contagens nao sao relevantes, porque os buffers tem tamanhos diferentes.
+            pd.set_option("display.max_rows", None) 
             df= pd.DataFrame(self.records)
-            sum_scenarios= df.groupby("scenario")["timeSec"].sum()
+            df1= df
+            df2= df
+            df3= df
+            df4= df
+            # df1= pd.DataFrame(self.records1)    
+            # df2= pd.DataFrame(self.records2)
+            # df3= pd.DataFrame(self.records3)
+            # df4= pd.DataFrame(self.records4)
+
+            sum_scenarios= df[~df["scenario"].isin(self.badScenarios)].groupby("scenario")["timeSec"].sum()
+
+            #record_por_cenarios= df[~df["scenario"].isin(self.badScenarios)].groupby("scenario")["timeSec"].size().reset_index(name="num_registros").sort_values("num_registros", ascending=False)            
+            # record_por_cenarios= ~df.isin(self.badScenarios).size()
+            #print(record_por_cenarios)
+
             avg_time_per_scenario=  sum_scenarios.mean()
             stdev_time_per_scenario = sum_scenarios.std()
 
             self.worstScenario= sum_scenarios.idxmax()
             self.bestScenario= sum_scenarios.idxmin()
             max_time_per_scenario = sum_scenarios.max()
-            min_time_per_scenario = sum_scenarios.min()      
+            min_time_per_scenario = sum_scenarios.min()    
+
             
         
             avg_simulation = statistics.mean(self.Simulations)
@@ -235,6 +268,35 @@ class MyPlot(object):
             print(f'Stdev per Scenarios: {stdev_time_per_scenario}')  
             print(f'Max per Scenarios: {self.worstScenario} {max_time_per_scenario}') 
             print(f'Min per Scenarios: {self.bestScenario} {min_time_per_scenario}') 
+
+           
+            Size_time_per_record1 = df1["timeSec"].count()
+            Avg_time_per_record1 = df1["timeSec"].mean()
+            Stdev_time_per_record1= df1["timeSec"].std()
+            print(f'Count per record1 < {self.categories[0]} MB: {Size_time_per_record1}')
+            print(f'AVG per record1 < {self.categories[0]} MB: {Avg_time_per_record1}') 
+            print(f'Stdev per record1 < {self.categories[0]} MB: {Stdev_time_per_record1}')
+
+            Size_time_per_record2 = df2["timeSec"].count()
+            Avg_time_per_record2 = df2["timeSec"].mean()
+            Stdev_time_per_record2= df2["timeSec"].std()
+            print(f'Count per record2 < {self.categories[1]} MB: {Size_time_per_record2}')  
+            print(f'AVG per record2 < {self.categories[1]} MB: {Avg_time_per_record2}') 
+            print(f'Stdev per record2 < {self.categories[1]} MB: {Stdev_time_per_record2}')
+
+            Size_time_per_record3 = df3["timeSec"].count()
+            Avg_time_per_record3 = df3["timeSec"].mean()
+            Stdev_time_per_record3= df3["timeSec"].std()
+            print(f'Count per record3 < {self.categories[2]} MB: {Size_time_per_record3}')
+            print(f'AVG per record3 < {self.categories[2]} MB: {Avg_time_per_record3}') 
+            print(f'Stdev per record3 < {self.categories[2]} MB: {  Stdev_time_per_record3}')
+
+            Size_time_per_record4 = df4["timeSec"].count()
+            Avg_time_per_record4 = df4["timeSec"].mean()              
+            Stdev_time_per_record4= df4["timeSec"].std()
+            print(f'Count per record4 >= {self.categories[2]} MB: {Size_time_per_record4}')
+            print(f'AVG per record4 >= {self.categories[2]} MB: {Avg_time_per_record4}') 
+            print(f'Stdev per record4 >= {self.categories[2]} MB: {Stdev_time_per_record4}')
 
 
             #sum_time= sum(self.diffs)
@@ -263,7 +325,11 @@ class MyPlot(object):
                              'Avg_time_per_scenario': avg_time_per_scenario ,'Stdev_time_per_scenario': stdev_time_per_scenario,
                              'Avg_bandwidth': avg_bandwidth, 'Stddev_bandwidth': stddev_bandwidth,
                              'worstScenario': self.worstScenario, 'max_time_per_scenario': max_time_per_scenario,
-                             'bestScenario': self.bestScenario, 'min_time_per_scenario': min_time_per_scenario } )  
+                             'bestScenario': self.bestScenario, 'min_time_per_scenario': min_time_per_scenario ,
+                             'Avg_time_per_record1': Avg_time_per_record1 ,'Stdev_time_per_record1': Stdev_time_per_record1,
+                             'Avg_time_per_record2': Avg_time_per_record2 ,'Stdev_time_per_record2': Stdev_time_per_record2,
+                             'Avg_time_per_record3': Avg_time_per_record3 ,'Stdev_time_per_record3': Stdev_time_per_record3,
+                             'Avg_time_per_record4': Avg_time_per_record4 ,'Stdev_time_per_record4': Stdev_time_per_record4 } )  
             
    
     def escreveCsv(self,linha):
@@ -274,7 +340,12 @@ class MyPlot(object):
                      "Avg_time_per_scenario",'Stdev_time_per_scenario',                     
                      "Avg_bandwidth", "Stddev_bandwidth",
                      "worstScenario", "max_time_per_scenario",
-                     "bestScenario", "min_time_per_scenario"]
+                     "bestScenario", "min_time_per_scenario",
+                     "Avg_time_per_record1", "Stdev_time_per_record1",
+                     "Avg_time_per_record2", "Stdev_time_per_record2",
+                     "Avg_time_per_record3", "Stdev_time_per_record3",
+                     "Avg_time_per_record4", "Stdev_time_per_record4"
+                     ]
         escrever_cabecalho = not os.path.exists(path_csv) or os.path.getsize(path_csv) == 0
         with open(path_csv,mode='a',newline='',encoding='utf-8') as arquivo_csv:
             writer = csv.DictWriter(arquivo_csv, fieldnames=cabecalho)
@@ -308,6 +379,33 @@ class MyPlot(object):
         plt.tight_layout()     
         plt.legend()  
         plt.show()
+
+    def plotLatency(self,base_directory,plotLabel):
+        
+        df_csv = pd.read_csv(os.path.join(base_directory,"../plot.csv"),index_col='Nodes')
+        df_len = len(df_csv)
+        X = np.zeros(df_len)
+        categorias =  np.empty(df_len, dtype=object)
+        avgLatency = np.zeros(df_len)
+        stdLatency = np.zeros(df_len)
+        
+        for i in range(len(df_csv)):
+            X[i]= i
+            categorias[i]= f"{df_csv.index[i]} Nodes"
+            avgLatency[i]= df_csv.iloc[i]['Avg_time_per_scenario']
+            stdLatency[i]= df_csv.iloc[i]['Stdev_time_per_scenario']
+        # Plotando com barras de erro vindas da outra série
+        plt.figure(figsize=(8,5))      
+        plt.bar(X, avgLatency, yerr=stdLatency, label="Tempo envio(s)", capsize=8, color='lightgreen', edgecolor='black') 
+
+        plt.xticks(X, categorias)
+        plt.ylabel('Tempo envio médio de um cenário(s)')
+        plt.title(f'Tempo envio médio de um cenário(s) {plotLabel} com erro padrão')
+        plt.grid(True, axis='y', linestyle='--', alpha=0.5)
+        plt.tight_layout()     
+        plt.legend()  
+        plt.show()
+
 
 
     def plotExecutionTime(self,base_directory,plotLabel):
@@ -343,18 +441,23 @@ class MyPlot(object):
         plt.legend()    
         plt.show()
     
-    def PlotHistogram(self,max_size_kb=100000):
+    def PlotHistogram(self,max_size_kb=0):
 
         smallSizes=[]
         for row in self.records:
             smallSizesInKb= row['sizeBytes'] / 1024
-            if smallSizesInKb < max_size_kb:
+            if max_size_kb == 0 or smallSizesInKb < max_size_kb:
                 smallSizes.append(smallSizesInKb)                
         plt.figure(figsize=(8,5))
-        plt.hist(smallSizes, bins=50000, color='blue', alpha=0.7, edgecolor='black')
-        plt.title('Histograma Tamanho arquivos')
-        plt.xlabel('Tamanho (KB)')
+        plt.hist(smallSizes, bins=500, color='blue', alpha=0.7, edgecolor='black')
+        plt.title('Histograma do tamanho dos blocos')
+        plt.xlabel('Tamanho (KBytes)')
         plt.ylabel('Frequência')
+        #plt.xscale('log')     
+        #plt.xlim(left=0.6, right=50000)
+        #plt.xticks([1, 1000, 10000, 50000])
+     
+         
         plt.grid(axis='y', linestyle='--', alpha=0.7)
         plt.tight_layout()
         plt.show()
