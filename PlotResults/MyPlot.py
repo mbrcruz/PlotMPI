@@ -7,6 +7,7 @@ import csv
 import random
 import statistics
 from enum import Enum
+from matplotlib.ticker import ScalarFormatter, LogLocator
 
 
 
@@ -445,19 +446,27 @@ class MyPlot(object):
 
         smallSizes=[]
         for row in self.records:
-            smallSizesInKb= row['sizeBytes'] / 1024
+            smallSizesInKb= row['sizeBytes']/1024
             if max_size_kb == 0 or smallSizesInKb < max_size_kb:
                 smallSizes.append(smallSizesInKb)                
         plt.figure(figsize=(8,5))
         plt.hist(smallSizes, bins=500, color='blue', alpha=0.7, edgecolor='black')
-        plt.title('Histograma do tamanho dos blocos')
-        plt.xlabel('Tamanho (KBytes)')
+
+        ax = plt.gca()
+
+        # Coloca ticks principais em potências de 10
+        ax.xaxis.set_major_locator(LogLocator(base=10.0, subs=None))
+        # Formata os ticks como números decimais normais
+        ax.xaxis.set_major_formatter(ScalarFormatter())
+        ax.ticklabel_format(style='plain', axis='x')   # evita notação científica
+        plt.title('Histograma do tamanho das mensagens enviadas')
+        plt.xlabel('Tamanho (KBytes) em escala logarítmica')
         plt.ylabel('Frequência')
-        #plt.xscale('log')     
+        plt.xscale('log')     
         #plt.xlim(left=0.6, right=50000)
-        #plt.xticks([1, 1000, 10000, 50000])
-     
-         
+        #plt.xticks([1, 1000, 10000, 20000,30000,50000])
+        ticks = [1, 1000, 50000]
+        plt.xticks(ticks, [str(t) for t in ticks])
         plt.grid(axis='y', linestyle='--', alpha=0.7)
         plt.tight_layout()
         plt.show()
