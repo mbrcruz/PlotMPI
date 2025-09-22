@@ -42,7 +42,7 @@ class MyPlot(object):
         self.localScenarios=[]   
         self.bestScenario=0
         self.worstScenario=0 
-        self.categories=[1,10,30]
+        self.categories=[1,20,30,50]
         self.records1=[]
         self.records2=[]
         self.records3=[]
@@ -76,6 +76,7 @@ class MyPlot(object):
             self.X2= {i: {} for i in range(1, self.number_scenarios+1 )}
             self.X3= {i: {} for i in range(1, self.number_scenarios+1 )}
             self.X4= {i: {} for i in range(1, self.number_scenarios+1 )}
+            self.localScenarios=[]
 
             initial_rank = 2
 
@@ -245,34 +246,46 @@ class MyPlot(object):
         print(f'Max per Scenarios: {self.worstScenario} {max_time_per_scenario}') 
         print(f'Min per Scenarios: {self.bestScenario} {min_time_per_scenario}') 
 
+
+        Avg_time_per_record1=0
+        Stdev_time_per_record1=0    
+        Avg_time_per_record2=0
+        Stdev_time_per_record2=0            
+        Avg_time_per_record3=0
+        Stdev_time_per_record3=0
+        Avg_time_per_record4=0
+        Stdev_time_per_record4=0
         
-        Size_time_per_record1 = df1["timeSec"].count()/10
-        Avg_time_per_record1 = df1.groupby("experiment")["timeSec"].mean().mean()
-        Stdev_time_per_record1= df1.groupby("experiment")["timeSec"].mean().std()
-        print(f'Count per record1 < {self.categories[0]} MB: {Size_time_per_record1}')
-        print(f'AVG per record1 < {self.categories[0]} MB: {Avg_time_per_record1}') 
-        print(f'Stdev per record1 < {self.categories[0]} MB: {Stdev_time_per_record1}')
+        if len(self.records1) >0:
+            Size_time_per_record1 = df1["timeSec"].count()/10
+            Avg_time_per_record1 = df1.groupby("experiment")["timeSec"].mean().mean()
+            Stdev_time_per_record1= df1.groupby("experiment")["timeSec"].mean().std()
+            print(f'Count per record1 < {self.categories[0]} MB: {Size_time_per_record1}')
+            print(f'AVG per record1 < {self.categories[0]} MB: {Avg_time_per_record1}') 
+            print(f'Stdev per record1 < {self.categories[0]} MB: {Stdev_time_per_record1}')
 
-        Size_time_per_record2 = df2["timeSec"].count()/10
-        Avg_time_per_record2 = df2.groupby("experiment")["timeSec"].mean().mean()
-        Stdev_time_per_record2= df2.groupby("experiment")["timeSec"].mean().std()
-        print(f'Count per record2 < {self.categories[1]} MB: {Size_time_per_record2}')  
-        print(f'AVG per record2 < {self.categories[1]} MB: {Avg_time_per_record2}') 
-        print(f'Stdev per record2 < {self.categories[1]} MB: {Stdev_time_per_record2}')
+        if len(self.records2) >0:
+            Size_time_per_record2 = df2["timeSec"].count()/10
+            Avg_time_per_record2 = df2.groupby("experiment")["timeSec"].mean().mean()
+            Stdev_time_per_record2= df2.groupby("experiment")["timeSec"].mean().std()
+            print(f'Count per record2 < {self.categories[1]} MB: {Size_time_per_record2}')  
+            print(f'AVG per record2 < {self.categories[1]} MB: {Avg_time_per_record2}') 
+            print(f'Stdev per record2 < {self.categories[1]} MB: {Stdev_time_per_record2}')
 
-        Size_time_per_record3 = df3["timeSec"].count()/10
-        Avg_time_per_record3 = df3.groupby("experiment")["timeSec"].mean().mean()
-        Stdev_time_per_record3= df3.groupby("experiment")["timeSec"].mean().std()
-        print(f'Count per record3 < {self.categories[2]} MB: {Size_time_per_record3}')
-        print(f'AVG per record3 < {self.categories[2]} MB: {Avg_time_per_record3}') 
-        print(f'Stdev per record3 < {self.categories[2]} MB: {  Stdev_time_per_record3}')
-
-        Size_time_per_record4 = df4["timeSec"].count()/10
-        Avg_time_per_record4 = df4.groupby("experiment")["timeSec"].mean().mean()
-        Stdev_time_per_record4= df4.groupby("experiment")["timeSec"].mean().std()
-        print(f'Count per record4 >= {self.categories[2]} MB: {Size_time_per_record4}')
-        print(f'AVG per record4 >= {self.categories[2]} MB: {Avg_time_per_record4}') 
-        print(f'Stdev per record4 >= {self.categories[2]} MB: {Stdev_time_per_record4}')
+        if len(self.records3) > 0:
+            Size_time_per_record3 = df3["timeSec"].count()/10
+            Avg_time_per_record3 = df3.groupby("experiment")["timeSec"].mean().mean()
+            Stdev_time_per_record3= df3.groupby("experiment")["timeSec"].mean().std()
+            print(f'Count per record3 < {self.categories[2]} MB: {Size_time_per_record3}')
+            print(f'AVG per record3 < {self.categories[2]} MB: {Avg_time_per_record3}') 
+            print(f'Stdev per record3 < {self.categories[2]} MB: {  Stdev_time_per_record3}')
+        if len(self.records4) > 0:
+            Size_time_per_record4 = df4["timeSec"].count()/10
+            Avg_time_per_record4 = df4.groupby("experiment")["timeSec"].mean().mean()
+            Stdev_time_per_record4= df4.groupby("experiment")["timeSec"].mean().std()
+            print(f'Count per record4 >= {self.categories[2]} MB: {Size_time_per_record4}')
+            print(f'AVG per record4 >= {self.categories[2]} MB: {Avg_time_per_record4}') 
+            print(f'Stdev per record4 >= {self.categories[2]} MB: {Stdev_time_per_record4}')
 
         
         #sum_time= sum(self.diffs)
