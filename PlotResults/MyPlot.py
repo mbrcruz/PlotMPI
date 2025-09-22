@@ -42,7 +42,7 @@ class MyPlot(object):
         self.localScenarios=[]   
         self.bestScenario=0
         self.worstScenario=0 
-        self.categories=[1,20,30,50]
+        self.categories=[0.128,1,30,50]
         self.records1=[]
         self.records2=[]
         self.records3=[]
