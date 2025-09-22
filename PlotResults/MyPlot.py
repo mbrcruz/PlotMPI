@@ -42,7 +42,7 @@ class MyPlot(object):
         self.localScenarios=[]   
         self.bestScenario=0
         self.worstScenario=0 
-        self.categories=[10,30,40,50]
+        self.categories=[1,10,30]
         self.records1=[]
         self.records2=[]
         self.records3=[]
@@ -63,168 +63,144 @@ class MyPlot(object):
         return self.colors[k]
 
     def load_data(self, filter_scenario=0,experiments=10,min_size=0,max_size=0):
-         
-        small_length=0.1
-        scale = 10**6            
-        #plt.ylim(0, self.number_scenarios+1)
-        #plt.xscale('log')
-        #plt.yscale('linear')
-        if self.limit==0:
-            self.limit=3000
-        # plt.xlim(0, self.limit*scale)
-        # plt.xlabel('Time in microseconds(ms)')
-        # plt.ylabel('Core Id')
 
-        # plt.grid(True, linestyle='--', color='gray', alpha=0.5)   
-        # plt.axhline(y=0, color='k', linewidth=0.1)
-        # plt.axvline(x=0, color='k', linewidth=0.1)
-        #max= 0
-        ind= 0      
-        count_buffer=0
-        
         if ( not self.typeEvaluation == TypeEvaluation.JUST_COMUNICATION 
-        and not self.typeEvaluation == TypeEvaluation.COMUNICATION_AND_IO        
-        and not self.typeEvaluation == TypeEvaluation.JUST_SEND):          
-            raise Exception("Bad configuration.")
-        
+            and not self.typeEvaluation == TypeEvaluation.COMUNICATION_AND_IO        
+            and not self.typeEvaluation == TypeEvaluation.JUST_SEND):          
+                raise Exception("Bad configuration.")
+    
+        for experiment in range(experiments):        
+            print(f'Loading Experiment {experiment+1}')
+            '#initialize data structures'
+            self.X1= {i: {} for i in range(1, self.number_scenarios+1 )}
+            self.X2= {i: {} for i in range(1, self.number_scenarios+1 )}
+            self.X3= {i: {} for i in range(1, self.number_scenarios+1 )}
+            self.X4= {i: {} for i in range(1, self.number_scenarios+1 )}
 
-        self.X1= {i: {} for i in range(1, self.number_scenarios+1 )}
-        self.X2= {i: {} for i in range(1, self.number_scenarios+1 )}
-        self.X3= {i: {} for i in range(1, self.number_scenarios+1 )}
-        self.X4= {i: {} for i in range(1, self.number_scenarios+1 )}
+            initial_rank = 2
 
-        start = 2
-        for i in range(self.number_nodes * self.number_scenarios_per_nodes):
-            sufix= start +i        
-            print(f'Loading Processes {i+1}')
-            df= pd.read_csv(os.path.join(self.base_directory ,f"mpiio-{sufix}.log"),header=None)
-                
-            if ( self.start_moment > df.iloc[0,5] ):
-                self.start_moment= df.iloc[0,5]
-        
-            for k in range(len(df)):
-                self.numberBuffers += 1
-                scenario = df.iloc[k,2]
-                file = df.iloc[k,3]
-                seq = df.iloc[k,4] 
-                time = df.iloc[k,5]
-                time2 = df.iloc[k,6]
-                size = df.iloc[k,8]
-                
-                if self.onlyRemote and i < self.number_scenarios_per_nodes:
-                    if scenario not in self.localScenarios:
-                        self.localScenarios.append(scenario)                       
-                if file in self.X1[scenario]:
-                    if seq in self.X1[scenario][file] and self.X1[scenario][file][seq] < time:
-                        continue
-                    else: 
-                        self.X1[scenario][file][seq]=  ( time , size )                       
-                        self.X2[scenario][file][seq]= ( time2 , size )  
-                        self.dicionarioScenarios[(i+1,seq)]= (scenario,file)
-                else:
-                    self.X1[scenario][file]={}
-                    self.X1[scenario][file][seq]= ( time , size )                   
-                    self.X2[scenario][file]={}
-                    self.X2[scenario][file][seq]= ( time2 , size ) 
-                    self.dicionarioScenarios[(i+1,seq)]= (scenario,file)
-
-
+            for i in range(self.number_nodes * self.number_scenarios_per_nodes):
+                sufix= initial_rank +i        
+                print(f'Loading Processes {i+1}')
+                df= pd.read_csv(os.path.join(self.base_directory, str(experiment+1),  f"mpiio-{sufix}.log"),header=None)
+                    
+                if ( self.start_moment > df.iloc[0,5] ):
+                    self.start_moment= df.iloc[0,5]
             
-            self.df_times= pd.read_csv(os.path.join(self.base_directory ,f"sddptimer{sufix:04d}.log"),header=None)
-            for k in range(len(self.df_times)):
-                if  self.df_times.iloc[k,0] == "Simulation":
-                    self.Simulations.append(float(self.df_times.iloc[k,1]))  
-
-        self.df_master=pd.read_csv(os.path.join(self.base_directory ,f"mpiio-master.log"),header=None)    
-        for k in range(len(self.df_master)):           
-
-            cpu = self.df_master.iloc[k,0]
-            seq = self.df_master.iloc[k,1]           
-            time = self.df_master.iloc[k,2] 
-            time2= self.df_master.iloc[k,6]
-           
-            try:
-                scenario = self.dicionarioScenarios.get((cpu,seq))[0]
-                file = self.dicionarioScenarios.get((cpu,seq))[1] 
-                if self.X1[scenario][file][seq]:
-                    if file in self.X3[scenario]:
-                        if seq in self.X3[scenario][file] and self.X3[scenario][file][seq] > time:
+                for k in range(len(df)):
+                    self.numberBuffers += 1
+                    scenario = df.iloc[k,2]
+                    file = df.iloc[k,3]
+                    seq = df.iloc[k,4] 
+                    time = df.iloc[k,5]
+                    time2 = df.iloc[k,6]
+                    size = df.iloc[k,8]
+                    
+                    if self.onlyRemote and i < self.number_scenarios_per_nodes:
+                        if scenario not in self.localScenarios:
+                            self.localScenarios.append(scenario)                       
+                    if file in self.X1[scenario]:
+                        if seq in self.X1[scenario][file] and self.X1[scenario][file][seq] < time:
                             continue
                         else: 
-                            self.X3[scenario][file][seq]=  time     
-                            self.X4[scenario][file][seq]=  time2
+                            self.X1[scenario][file][seq]=  ( time , size )                       
+                            self.X2[scenario][file][seq]= ( time2 , size )  
+                            self.dicionarioScenarios[(i+1,seq)]= (scenario,file)
                     else:
-                        self.X3[scenario][file]={}
-                        self.X3[scenario][file][seq]= time
-                        self.X4[scenario][file]={}
-                        self.X4[scenario][file][seq]= time2
-            except KeyError:
-                #print(f"KeyError {scenario} {file} {seq}")
-                continue   
-            except TypeError:
-                #print(f"TypeError {scenario} {file} {seq}")
-                continue
-   
+                        self.X1[scenario][file]={}
+                        self.X1[scenario][file][seq]= ( time , size )                   
+                        self.X2[scenario][file]={}
+                        self.X2[scenario][file][seq]= ( time2 , size ) 
+                        self.dicionarioScenarios[(i+1,seq)]= (scenario,file)
 
-        first_scenario = 0
-        for i in range(self.number_scenarios):    
-            scenario = i+1        
+
+                
+                self.df_times= pd.read_csv(os.path.join(self.base_directory , str(experiment+1), f"sddptimer{sufix:04d}.log"),header=None)
+                for k in range(len(self.df_times)):
+                    if  self.df_times.iloc[k,0] == "Simulation":
+                        self.Simulations.append(float(self.df_times.iloc[k,1]))
             
-            tdiff = 0                  
-            last_x1=0
-            if scenario in self.localScenarios:     
-                print( f"Ignoring local scenario {scenario} ...")         
-                continue
-            else:
-                print( f"Computing scenario {scenario} ...")  
-                if first_scenario == 0:
-                    first_scenario = scenario
-                for file in self.X1[scenario]:
-                    for block in self.X1[scenario][file]:               
-                        x1 = ( self.X1[scenario][file][block][0] - self.start_moment )  
-                        size = self.X1[scenario][file][block][1]
-                        try:                    
-                            x2 = ( self.X2[scenario][file][block][0] - self.start_moment )  
-                            x3 = ( self.X3[scenario][file][block] - self.start_moment )
-                            x4 = ( self.X4[scenario][file][block] - self.start_moment )
-                            count_buffer+= 1
-                        except KeyError:
-                            print(f"KeyError {scenario} {file} {block}")
-                            exit(-1)   
-                        diff = 0 
+            self.df_master=pd.read_csv(os.path.join(self.base_directory , str(experiment+1), "mpiio-master.log"),header=None)    
 
-                        if self.typeEvaluation == TypeEvaluation.JUST_SEND:
-                            diff= x2 - x1
-                        elif self.typeEvaluation == TypeEvaluation.JUST_COMUNICATION:
-                            diff= (x3 - x1)
+            for k in range(len(self.df_master)):           
+
+                cpu = self.df_master.iloc[k,0]
+                seq = self.df_master.iloc[k,1]           
+                time = self.df_master.iloc[k,2] 
+                time2= self.df_master.iloc[k,6]
+            
+                try:
+                    scenario = self.dicionarioScenarios.get((cpu,seq))[0]
+                    file = self.dicionarioScenarios.get((cpu,seq))[1] 
+                    if self.X1[scenario][file][seq]:
+                        if file in self.X3[scenario]:
+                            if seq in self.X3[scenario][file] and self.X3[scenario][file][seq] > time:
+                                continue
+                            else: 
+                                self.X3[scenario][file][seq]=  time     
+                                self.X4[scenario][file][seq]=  time2
                         else:
-                            diff= (x4 - x3 ) + ( x2 - x1)
-                                        
-                        if diff <= 0:                           
-                            if scenario not in self.badScenarios: 
-                                 print(f"Diff is zero or negative: {diff} for {scenario} {file} {block}")  
-                                 self.badScenarios.append(scenario)     
-                            continue              
-                        else:                  
-                            # The following elifs were empty and are removed for clarity
-                            # If you want to add logic for sizeMB ranges, add code here
-                            if filter_scenario == 0 or scenario == filter_scenario:     
-                                record= { "scenario": scenario, 'file': file, 'block': block, 'sizeBytes': size  , 'timeSec': diff }   
-                                self.records.append(record)     
-                                if size / (1024 * 1024) < self.categories[0]:
-                                    self.records1.append(record)
-                                elif size / (1024 * 1024) < self.categories[1]: 
-                                      self.records2.append(record)   
-                                elif size / (1024 * 1024)< self.categories[2]: 
-                                      self.records3.append(record)
-                                else:
-                                      self.records4.append(record)               
+                            self.X3[scenario][file]={}
+                            self.X3[scenario][file][seq]= time
+                            self.X4[scenario][file]={}
+                            self.X4[scenario][file][seq]= time2
+                except KeyError:
+                    #print(f"KeyError {scenario} {file} {seq}")
+                    continue   
+                except TypeError:
+                    #print(f"TypeError {scenario} {file} {seq}")
+                    continue
+            
+            for i in range(self.number_scenarios):    
+                scenario = i+1        
+                
+                tdiff = 0                  
+                last_x1=0
+                if scenario in self.localScenarios:     
+                    print( f"Ignoring local scenario {scenario} ...")         
+                    continue
+                else:
+                    print( f"Computing scenario {scenario} ...")                  
+                    for file in self.X1[scenario]:
+                        for block in self.X1[scenario][file]:               
+                            x1 = ( self.X1[scenario][file][block][0] - self.start_moment )  
+                            size = self.X1[scenario][file][block][1]
+                            try:                    
+                                x2 = ( self.X2[scenario][file][block][0] - self.start_moment )  
+                                x3 = ( self.X3[scenario][file][block] - self.start_moment )
+                                x4 = ( self.X4[scenario][file][block] - self.start_moment )                            
+                            except KeyError:
+                                print(f"KeyError {scenario} {file} {block}")
+                                exit(-1)   
+                            diff = 0 
 
-                        #if x1 < self.limit:
-                        #    plt.scatter(x1*scale,scenario+1, color=self.random_color(file),s=1)
-                        #plt.plot([x1*scale,x2*scale],[scenario+1,scenario+1], color=self.random_color(file),marker="o",markersize=1)
-                        #plt.plot([x1*scale,x2*scale],[scenario+1,scenario+1], color=self.random_color(file),linewidth=1)
-       
+                            if self.typeEvaluation == TypeEvaluation.JUST_SEND:
+                                diff= x2 - x1
+                            elif self.typeEvaluation == TypeEvaluation.JUST_COMUNICATION:
+                                diff= (x3 - x1)
+                            else:
+                                diff= (x4 - x3 ) + ( x2 - x1)
+                                            
+                            if diff <= 0:                           
+                                if scenario not in self.badScenarios: 
+                                    print(f"Diff is zero or negative: {diff} for {scenario} {file} {block}")  
+                                    self.badScenarios.append(scenario)     
+                                continue              
+                            else:                  
+                                # The following elifs were empty and are removed for clarity
+                                # If you want to add logic for sizeMB ranges, add code here
+                                if filter_scenario == 0 or scenario == filter_scenario:     
+                                    record= { "experiment": experiment, "scenario": scenario, 'file': file, 'block': block, 'sizeBytes': size  , 'timeSec': diff }   
+                                    self.records.append(record)  
+                                    #separating records by size categories   
+                                    if size / (1024 * 1024) < self.categories[0]:
+                                        self.records1.append(record)
+                                    elif size / (1024 * 1024) < self.categories[1]: 
+                                        self.records2.append(record)   
+                                    elif size / (1024 * 1024)< self.categories[2]: 
+                                        self.records3.append(record)
+                                    else:
+                                        self.records4.append(record)                      
 
     def show_config(self):
         print( f" Number Scenario {self.number_scenarios}")
@@ -240,19 +216,20 @@ class MyPlot(object):
         df2= df
         df3= df
         df4= df
-        # df1= pd.DataFrame(self.records1)    
-        # df2= pd.DataFrame(self.records2)
-        # df3= pd.DataFrame(self.records3)
-        # df4= pd.DataFrame(self.records4)
+        df1= pd.DataFrame(self.records1)    
+        df2= pd.DataFrame(self.records2)
+        df3= pd.DataFrame(self.records3)
+        df4= pd.DataFrame(self.records4)
 
-        sum_scenarios= df[~df["scenario"].isin(self.badScenarios)].groupby("scenario")["timeSec"].sum()
+        sum_scenarios= df.groupby(["experiment","scenario"])["timeSec"].sum()
 
         #record_por_cenarios= df[~df["scenario"].isin(self.badScenarios)].groupby("scenario")["timeSec"].size().reset_index(name="num_registros").sort_values("num_registros", ascending=False)            
         # record_por_cenarios= ~df.isin(self.badScenarios).size()
-        #print(record_por_cenarios)
-
-        avg_time_per_scenario=  sum_scenarios.mean()
-        stdev_time_per_scenario = sum_scenarios.std()
+        #print(record_por_cenarios)                
+        avg_time_per_scenario=  sum_scenarios.groupby("experiment").mean().mean()
+        print(avg_time_per_scenario)
+        stdev_time_per_scenario = sum_scenarios.groupby("experiment").mean().std()
+        print(stdev_time_per_scenario)
 
         self.worstScenario= sum_scenarios.idxmax()
         self.bestScenario= sum_scenarios.idxmin()
@@ -262,42 +239,42 @@ class MyPlot(object):
     
         avg_simulation = statistics.mean(self.Simulations)
         stdev_simulation  = statistics.stdev(self.Simulations)
-        print(f'Number Buffers: {self.records.count}')                
+        #print(f'Number Buffers: {self.records.count}')                
         print(f'AVG per Scenarios: {avg_time_per_scenario}')        
         print(f'Stdev per Scenarios: {stdev_time_per_scenario}')  
         print(f'Max per Scenarios: {self.worstScenario} {max_time_per_scenario}') 
         print(f'Min per Scenarios: {self.bestScenario} {min_time_per_scenario}') 
 
         
-        Size_time_per_record1 = df1["timeSec"].count()
-        Avg_time_per_record1 = df1["timeSec"].mean()
-        Stdev_time_per_record1= df1["timeSec"].std()
+        Size_time_per_record1 = df1["timeSec"].count()/10
+        Avg_time_per_record1 = df1.groupby("experiment")["timeSec"].mean().mean()
+        Stdev_time_per_record1= df1.groupby("experiment")["timeSec"].mean().std()
         print(f'Count per record1 < {self.categories[0]} MB: {Size_time_per_record1}')
         print(f'AVG per record1 < {self.categories[0]} MB: {Avg_time_per_record1}') 
         print(f'Stdev per record1 < {self.categories[0]} MB: {Stdev_time_per_record1}')
 
-        Size_time_per_record2 = df2["timeSec"].count()
-        Avg_time_per_record2 = df2["timeSec"].mean()
-        Stdev_time_per_record2= df2["timeSec"].std()
+        Size_time_per_record2 = df2["timeSec"].count()/10
+        Avg_time_per_record2 = df2.groupby("experiment")["timeSec"].mean().mean()
+        Stdev_time_per_record2= df2.groupby("experiment")["timeSec"].mean().std()
         print(f'Count per record2 < {self.categories[1]} MB: {Size_time_per_record2}')  
         print(f'AVG per record2 < {self.categories[1]} MB: {Avg_time_per_record2}') 
         print(f'Stdev per record2 < {self.categories[1]} MB: {Stdev_time_per_record2}')
 
-        Size_time_per_record3 = df3["timeSec"].count()
-        Avg_time_per_record3 = df3["timeSec"].mean()
-        Stdev_time_per_record3= df3["timeSec"].std()
+        Size_time_per_record3 = df3["timeSec"].count()/10
+        Avg_time_per_record3 = df3.groupby("experiment")["timeSec"].mean().mean()
+        Stdev_time_per_record3= df3.groupby("experiment")["timeSec"].mean().std()
         print(f'Count per record3 < {self.categories[2]} MB: {Size_time_per_record3}')
         print(f'AVG per record3 < {self.categories[2]} MB: {Avg_time_per_record3}') 
         print(f'Stdev per record3 < {self.categories[2]} MB: {  Stdev_time_per_record3}')
 
-        Size_time_per_record4 = df4["timeSec"].count()
-        Avg_time_per_record4 = df4["timeSec"].mean()              
-        Stdev_time_per_record4= df4["timeSec"].std()
+        Size_time_per_record4 = df4["timeSec"].count()/10
+        Avg_time_per_record4 = df4.groupby("experiment")["timeSec"].mean().mean()
+        Stdev_time_per_record4= df4.groupby("experiment")["timeSec"].mean().std()
         print(f'Count per record4 >= {self.categories[2]} MB: {Size_time_per_record4}')
         print(f'AVG per record4 >= {self.categories[2]} MB: {Avg_time_per_record4}') 
         print(f'Stdev per record4 >= {self.categories[2]} MB: {Stdev_time_per_record4}')
 
-
+        
         #sum_time= sum(self.diffs)
         #Calcula o tempo medio de cada cenario e depois multiplica pelo numero de cenario executado por processo.
         avg_per_process = ( avg_time_per_scenario * self.number_scenarios/ ( ( self.number_nodes - 1) * self.number_scenarios_per_nodes) )
