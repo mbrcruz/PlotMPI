@@ -62,7 +62,25 @@ class MyPlot(object):
             self.colors[k]='#{:06x}'.format(random.randint(0, 0xFFFFFF))            
         return self.colors[k]
 
-    def load_data(self):
+    def load_data(self, filter_scenario=0,experiments=10,min_size=0,max_size=0):
+         
+        small_length=0.1
+        scale = 10**6            
+        #plt.ylim(0, self.number_scenarios+1)
+        #plt.xscale('log')
+        #plt.yscale('linear')
+        if self.limit==0:
+            self.limit=3000
+        # plt.xlim(0, self.limit*scale)
+        # plt.xlabel('Time in microseconds(ms)')
+        # plt.ylabel('Core Id')
+
+        # plt.grid(True, linestyle='--', color='gray', alpha=0.5)   
+        # plt.axhline(y=0, color='k', linewidth=0.1)
+        # plt.axvline(x=0, color='k', linewidth=0.1)
+        #max= 0
+        ind= 0      
+        count_buffer=0
         
         if ( not self.typeEvaluation == TypeEvaluation.JUST_COMUNICATION 
         and not self.typeEvaluation == TypeEvaluation.COMUNICATION_AND_IO        
@@ -146,34 +164,7 @@ class MyPlot(object):
             except TypeError:
                 #print(f"TypeError {scenario} {file} {seq}")
                 continue
-       
-
-    def show_config(self):
-        print( f" Number Scenario {self.number_scenarios}")
-        print( f" Base Directory {self.base_directory}")
    
-    def computerMetrics(self,escrever_csv=True, filter_scenario=0,min_size=0,max_size=1000):     
-        
-        small_length=0.1
-        scale = 10**6            
-        #plt.ylim(0, self.number_scenarios+1)
-        #plt.xscale('log')
-        #plt.yscale('linear')
-        if self.limit==0:
-            self.limit=3000
-        # plt.xlim(0, self.limit*scale)
-        # plt.xlabel('Time in microseconds(ms)')
-        # plt.ylabel('Core Id')
-
-        # plt.grid(True, linestyle='--', color='gray', alpha=0.5)   
-        # plt.axhline(y=0, color='k', linewidth=0.1)
-        # plt.axvline(x=0, color='k', linewidth=0.1)
-       
-        
-
-        #max= 0
-        ind= 0      
-        count_buffer=0
 
         first_scenario = 0
         for i in range(self.number_scenarios):    
@@ -233,106 +224,113 @@ class MyPlot(object):
                         #    plt.scatter(x1*scale,scenario+1, color=self.random_color(file),s=1)
                         #plt.plot([x1*scale,x2*scale],[scenario+1,scenario+1], color=self.random_color(file),marker="o",markersize=1)
                         #plt.plot([x1*scale,x2*scale],[scenario+1,scenario+1], color=self.random_color(file),linewidth=1)
-        if escrever_csv:
-             # as 2 contagens nao sao relevantes, porque os buffers tem tamanhos diferentes.
-            pd.set_option("display.max_rows", None) 
-            df= pd.DataFrame(self.records)
-            df1= df
-            df2= df
-            df3= df
-            df4= df
-            # df1= pd.DataFrame(self.records1)    
-            # df2= pd.DataFrame(self.records2)
-            # df3= pd.DataFrame(self.records3)
-            # df4= pd.DataFrame(self.records4)
+       
 
-            sum_scenarios= df[~df["scenario"].isin(self.badScenarios)].groupby("scenario")["timeSec"].sum()
-
-            #record_por_cenarios= df[~df["scenario"].isin(self.badScenarios)].groupby("scenario")["timeSec"].size().reset_index(name="num_registros").sort_values("num_registros", ascending=False)            
-            # record_por_cenarios= ~df.isin(self.badScenarios).size()
-            #print(record_por_cenarios)
-
-            avg_time_per_scenario=  sum_scenarios.mean()
-            stdev_time_per_scenario = sum_scenarios.std()
-
-            self.worstScenario= sum_scenarios.idxmax()
-            self.bestScenario= sum_scenarios.idxmin()
-            max_time_per_scenario = sum_scenarios.max()
-            min_time_per_scenario = sum_scenarios.min()    
-
-            
-        
-            avg_simulation = statistics.mean(self.Simulations)
-            stdev_simulation  = statistics.stdev(self.Simulations)
-            print(f'Number Buffers: {self.records.count}')                
-            print(f'AVG per Scenarios: {avg_time_per_scenario}')        
-            print(f'Stdev per Scenarios: {stdev_time_per_scenario}')  
-            print(f'Max per Scenarios: {self.worstScenario} {max_time_per_scenario}') 
-            print(f'Min per Scenarios: {self.bestScenario} {min_time_per_scenario}') 
-
-           
-            Size_time_per_record1 = df1["timeSec"].count()
-            Avg_time_per_record1 = df1["timeSec"].mean()
-            Stdev_time_per_record1= df1["timeSec"].std()
-            print(f'Count per record1 < {self.categories[0]} MB: {Size_time_per_record1}')
-            print(f'AVG per record1 < {self.categories[0]} MB: {Avg_time_per_record1}') 
-            print(f'Stdev per record1 < {self.categories[0]} MB: {Stdev_time_per_record1}')
-
-            Size_time_per_record2 = df2["timeSec"].count()
-            Avg_time_per_record2 = df2["timeSec"].mean()
-            Stdev_time_per_record2= df2["timeSec"].std()
-            print(f'Count per record2 < {self.categories[1]} MB: {Size_time_per_record2}')  
-            print(f'AVG per record2 < {self.categories[1]} MB: {Avg_time_per_record2}') 
-            print(f'Stdev per record2 < {self.categories[1]} MB: {Stdev_time_per_record2}')
-
-            Size_time_per_record3 = df3["timeSec"].count()
-            Avg_time_per_record3 = df3["timeSec"].mean()
-            Stdev_time_per_record3= df3["timeSec"].std()
-            print(f'Count per record3 < {self.categories[2]} MB: {Size_time_per_record3}')
-            print(f'AVG per record3 < {self.categories[2]} MB: {Avg_time_per_record3}') 
-            print(f'Stdev per record3 < {self.categories[2]} MB: {  Stdev_time_per_record3}')
-
-            Size_time_per_record4 = df4["timeSec"].count()
-            Avg_time_per_record4 = df4["timeSec"].mean()              
-            Stdev_time_per_record4= df4["timeSec"].std()
-            print(f'Count per record4 >= {self.categories[2]} MB: {Size_time_per_record4}')
-            print(f'AVG per record4 >= {self.categories[2]} MB: {Avg_time_per_record4}') 
-            print(f'Stdev per record4 >= {self.categories[2]} MB: {Stdev_time_per_record4}')
-
-
-            #sum_time= sum(self.diffs)
-            #Calcula o tempo medio de cada cenario e depois multiplica pelo numero de cenario executado por processo.
-            avg_per_process = ( avg_time_per_scenario * self.number_scenarios/ ( ( self.number_nodes - 1) * self.number_scenarios_per_nodes) )
-            # # Average time per process)
-            print(f'Avg Comunication per Process(s): {avg_per_process}') 
-            print(f'Avg Simulation per Process(s): {avg_simulation}') 
-            print(f'StdDev Simulation per Process(s): {stdev_simulation}') 
-
-            
-
-            agrupados = df.groupby("scenario")[["sizeBytes","timeSec"]].sum()
-            bandwidth_per_scenario = ( agrupados["sizeBytes"] * 8 / 1000000000 ) / agrupados["timeSec"]  # em Gb/s
-            avg_bandwidth = bandwidth_per_scenario.mean()
-            stddev_bandwidth = bandwidth_per_scenario.std()
-            # total_size_per_nodes = statistics.mean(self.sizesPerScenario.values()) * self.number_scenarios_per_nodes/ 1000000000
-            # print(f'AVG size Scenario (MB): {avg_size:.2f}') 
-            # print(f'Total size per node (GB): {total_size_per_nodes:.2f}') 
-            print(f'AVG Bandwidth per scenario (Gb/s): {avg_bandwidth:.2f}') 
-            print(f'Stdev Bandwidth per scenario (Gb/s): {stddev_bandwidth:.2f}')
-            print("Writing CSV file...")
-            self.escreveCsv({ 'Nodes': self.number_nodes, 
-                             'Avg_Simulation': avg_simulation , 'Stdev_simulation': stdev_simulation,
-                             'Avg_comunication_time_per_process': avg_per_process, 
-                             'Avg_time_per_scenario': avg_time_per_scenario ,'Stdev_time_per_scenario': stdev_time_per_scenario,
-                             'Avg_bandwidth': avg_bandwidth, 'Stddev_bandwidth': stddev_bandwidth,
-                             'worstScenario': self.worstScenario, 'max_time_per_scenario': max_time_per_scenario,
-                             'bestScenario': self.bestScenario, 'min_time_per_scenario': min_time_per_scenario ,
-                             'Avg_time_per_record1': Avg_time_per_record1 ,'Stdev_time_per_record1': Stdev_time_per_record1,
-                             'Avg_time_per_record2': Avg_time_per_record2 ,'Stdev_time_per_record2': Stdev_time_per_record2,
-                             'Avg_time_per_record3': Avg_time_per_record3 ,'Stdev_time_per_record3': Stdev_time_per_record3,
-                             'Avg_time_per_record4': Avg_time_per_record4 ,'Stdev_time_per_record4': Stdev_time_per_record4 } )  
-            
+    def show_config(self):
+        print( f" Number Scenario {self.number_scenarios}")
+        print( f" Base Directory {self.base_directory}")
    
+    def computerMetrics(self):     
+        
+        
+            # as 2 contagens nao sao relevantes, porque os buffers tem tamanhos diferentes.
+        pd.set_option("display.max_rows", None) 
+        df= pd.DataFrame(self.records)
+        df1= df
+        df2= df
+        df3= df
+        df4= df
+        # df1= pd.DataFrame(self.records1)    
+        # df2= pd.DataFrame(self.records2)
+        # df3= pd.DataFrame(self.records3)
+        # df4= pd.DataFrame(self.records4)
+
+        sum_scenarios= df[~df["scenario"].isin(self.badScenarios)].groupby("scenario")["timeSec"].sum()
+
+        #record_por_cenarios= df[~df["scenario"].isin(self.badScenarios)].groupby("scenario")["timeSec"].size().reset_index(name="num_registros").sort_values("num_registros", ascending=False)            
+        # record_por_cenarios= ~df.isin(self.badScenarios).size()
+        #print(record_por_cenarios)
+
+        avg_time_per_scenario=  sum_scenarios.mean()
+        stdev_time_per_scenario = sum_scenarios.std()
+
+        self.worstScenario= sum_scenarios.idxmax()
+        self.bestScenario= sum_scenarios.idxmin()
+        max_time_per_scenario = sum_scenarios.max()
+        min_time_per_scenario = sum_scenarios.min() 
+        
+    
+        avg_simulation = statistics.mean(self.Simulations)
+        stdev_simulation  = statistics.stdev(self.Simulations)
+        print(f'Number Buffers: {self.records.count}')                
+        print(f'AVG per Scenarios: {avg_time_per_scenario}')        
+        print(f'Stdev per Scenarios: {stdev_time_per_scenario}')  
+        print(f'Max per Scenarios: {self.worstScenario} {max_time_per_scenario}') 
+        print(f'Min per Scenarios: {self.bestScenario} {min_time_per_scenario}') 
+
+        
+        Size_time_per_record1 = df1["timeSec"].count()
+        Avg_time_per_record1 = df1["timeSec"].mean()
+        Stdev_time_per_record1= df1["timeSec"].std()
+        print(f'Count per record1 < {self.categories[0]} MB: {Size_time_per_record1}')
+        print(f'AVG per record1 < {self.categories[0]} MB: {Avg_time_per_record1}') 
+        print(f'Stdev per record1 < {self.categories[0]} MB: {Stdev_time_per_record1}')
+
+        Size_time_per_record2 = df2["timeSec"].count()
+        Avg_time_per_record2 = df2["timeSec"].mean()
+        Stdev_time_per_record2= df2["timeSec"].std()
+        print(f'Count per record2 < {self.categories[1]} MB: {Size_time_per_record2}')  
+        print(f'AVG per record2 < {self.categories[1]} MB: {Avg_time_per_record2}') 
+        print(f'Stdev per record2 < {self.categories[1]} MB: {Stdev_time_per_record2}')
+
+        Size_time_per_record3 = df3["timeSec"].count()
+        Avg_time_per_record3 = df3["timeSec"].mean()
+        Stdev_time_per_record3= df3["timeSec"].std()
+        print(f'Count per record3 < {self.categories[2]} MB: {Size_time_per_record3}')
+        print(f'AVG per record3 < {self.categories[2]} MB: {Avg_time_per_record3}') 
+        print(f'Stdev per record3 < {self.categories[2]} MB: {  Stdev_time_per_record3}')
+
+        Size_time_per_record4 = df4["timeSec"].count()
+        Avg_time_per_record4 = df4["timeSec"].mean()              
+        Stdev_time_per_record4= df4["timeSec"].std()
+        print(f'Count per record4 >= {self.categories[2]} MB: {Size_time_per_record4}')
+        print(f'AVG per record4 >= {self.categories[2]} MB: {Avg_time_per_record4}') 
+        print(f'Stdev per record4 >= {self.categories[2]} MB: {Stdev_time_per_record4}')
+
+
+        #sum_time= sum(self.diffs)
+        #Calcula o tempo medio de cada cenario e depois multiplica pelo numero de cenario executado por processo.
+        avg_per_process = ( avg_time_per_scenario * self.number_scenarios/ ( ( self.number_nodes - 1) * self.number_scenarios_per_nodes) )
+        # # Average time per process)
+        print(f'Avg Comunication per Process(s): {avg_per_process}') 
+        print(f'Avg Simulation per Process(s): {avg_simulation}') 
+        print(f'StdDev Simulation per Process(s): {stdev_simulation}') 
+
+        
+
+        agrupados = df.groupby("scenario")[["sizeBytes","timeSec"]].sum()
+        bandwidth_per_scenario = ( agrupados["sizeBytes"] * 8 / 1000000000 ) / agrupados["timeSec"]  # em Gb/s
+        avg_bandwidth = bandwidth_per_scenario.mean()
+        stddev_bandwidth = bandwidth_per_scenario.std()
+        # total_size_per_nodes = statistics.mean(self.sizesPerScenario.values()) * self.number_scenarios_per_nodes/ 1000000000
+        # print(f'AVG size Scenario (MB): {avg_size:.2f}') 
+        # print(f'Total size per node (GB): {total_size_per_nodes:.2f}') 
+        print(f'AVG Bandwidth per scenario (Gb/s): {avg_bandwidth:.2f}') 
+        print(f'Stdev Bandwidth per scenario (Gb/s): {stddev_bandwidth:.2f}')
+        print("Writing CSV file...")
+        self.escreveCsv({ 'Nodes': self.number_nodes, 
+                            'Avg_Simulation': avg_simulation , 'Stdev_simulation': stdev_simulation,
+                            'Avg_comunication_time_per_process': avg_per_process, 
+                            'Avg_time_per_scenario': avg_time_per_scenario ,'Stdev_time_per_scenario': stdev_time_per_scenario,
+                            'Avg_bandwidth': avg_bandwidth, 'Stddev_bandwidth': stddev_bandwidth,
+                            'worstScenario': self.worstScenario, 'max_time_per_scenario': max_time_per_scenario,
+                            'bestScenario': self.bestScenario, 'min_time_per_scenario': min_time_per_scenario ,
+                            'Avg_time_per_record1': Avg_time_per_record1 ,'Stdev_time_per_record1': Stdev_time_per_record1,
+                            'Avg_time_per_record2': Avg_time_per_record2 ,'Stdev_time_per_record2': Stdev_time_per_record2,
+                            'Avg_time_per_record3': Avg_time_per_record3 ,'Stdev_time_per_record3': Stdev_time_per_record3,
+                            'Avg_time_per_record4': Avg_time_per_record4 ,'Stdev_time_per_record4': Stdev_time_per_record4 } )  
+        
+
     def escreveCsv(self,linha):
         path_csv = os.path.join(self.base_directory,"../plot.csv")
         cabecalho = ['Nodes', 
