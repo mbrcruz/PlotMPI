@@ -22,7 +22,7 @@ class MyPlot(object):
     """description of class"""
 
 
-    def __init__(self, base_directory,number_nodes, number_scenarios_per_node, number_scenarios, typeEvaluation= TypeEvaluation.JUST_COMUNICATION, onlyRemote=True, limit=-1):
+    def __init__(self, base_directory,number_nodes, number_scenarios_per_node, number_scenarios, typeEvaluation= TypeEvaluation.JUST_COMUNICATION, onlyRemote=False, limit=-1):
         self.number_nodes = number_nodes 
         self.number_scenarios_per_nodes = number_scenarios_per_node
         self.number_scenarios =  number_scenarios
@@ -42,7 +42,7 @@ class MyPlot(object):
         self.localScenarios=[]   
         self.bestScenario=0
         self.worstScenario=0 
-        self.categories=[0.128,1,30,50]
+        self.categories=[0.001,0.128,1,50]
         self.records1=[]
         self.records2=[]
         self.records3=[]
@@ -124,9 +124,9 @@ class MyPlot(object):
                         if  self.df_times.iloc[k,0] == "Simulation":
                             self.Simulations.append(float(self.df_times.iloc[k,1]))
                 
-                self.df_master=pd.read_csv(os.path.join(self.base_directory , str(experiment+1), "mpiio-master.log"),header=None)    
-
-                for k in range(len(self.df_master)):           
+                if ( os.path.exists(os.path.join(self.base_directory , str(experiment+1), "mpiio-master.log"))):
+                    self.df_master=pd.read_csv(os.path.join(self.base_directory , str(experiment+1), "mpiio-master.log"),header=None)    
+                    for k in range(len(self.df_master)):           
 
                     rank = self.df_master.iloc[k,0]
                     seq = self.df_master.iloc[k,1]           
@@ -173,20 +173,18 @@ class MyPlot(object):
 
                                 try:                    
                                     x2 = ( self.X2[scenario][file][block][0] - self.start_moment )  
-                                    x3 = ( self.X3[scenario][file][block] - self.start_moment )
-                                    x4 = ( self.X4[scenario][file][block] - self.start_moment )                                      
+                                    #x3 = ( self.X3[scenario][file][block] - self.start_moment )
+                                    #x4 = ( self.X4[scenario][file][block] - self.start_moment )                                      
                                 except KeyError:
                                     print(f"KeyError {scenario} {file} {block}")
                                     exit(-1)   
                                 diff = 0 
-
-                                if self.typeEvaluation == TypeEvaluation.JUST_SEND:
-                                    diff= x2 - x1
-                                elif self.typeEvaluation == TypeEvaluation.JUST_COMUNICATION:
-                                    diff= (x3 - x1)
-                                else:
-                                    diff= (x4 - x3 ) + ( x2 - x1)
-                                                
+                                diff= x2 - x1
+                                # if self.typeEvaluation == TypeEvaluation.JUST_SEND:                                    
+                                # elif self.typeEvaluation == TypeEvaluation.JUST_COMUNICATION:
+                                #     #diff= (x3 - x1)
+                                # else:
+                                #     #diff= (x4 - x3 ) + ( x2 - x1)                                                
                                 if diff < 0:                           
                                     if scenario not in self.badScenarios: 
                                         print(f"Diff is zero or negative: {diff} for {scenario} {file} {block}")  
@@ -377,7 +375,7 @@ class MyPlot(object):
     #     plt.legend()  
     #     plt.show()
 
-    def plotLatency(self,base_directory,plotLabel):
+    def plotScenarios(self,base_directory,plotLabel):
         
         df_csv = pd.read_csv(os.path.join(base_directory,"../plot.csv"),index_col='Nodes')
         df_len = len(df_csv)
@@ -385,6 +383,7 @@ class MyPlot(object):
         categorias =  np.empty(df_len, dtype=object)
         avgLatency = np.zeros(df_len)
         stdLatency = np.zeros(df_len)
+        
         
         for i in range(len(df_csv)):
             X[i]= i
@@ -398,6 +397,66 @@ class MyPlot(object):
         plt.xticks(X, categorias)
         plt.ylabel('Tempo envio médio de um cenário(s)')
         plt.title(f'Tempo envio médio de um cenário(s) {plotLabel} com erro padrão')
+        plt.grid(True, axis='y', linestyle='--', alpha=0.5)
+        plt.tight_layout()     
+        plt.legend()  
+        plt.show()
+
+    
+    def plotBlocks(self,base_directory,plotLabel,number_blocks=4):
+        
+        df_csv = pd.read_csv(os.path.join(base_directory,"../plot.csv"),index_col='Nodes')
+        number_conf = len(df_csv)
+        categorias =  np.empty(number_conf, dtype=object)       
+        xTicks = np.zeros(number_conf)      
+       
+
+        X= np.zeros((number_blocks,number_conf))
+        avgLatency = np.zeros((number_blocks,number_conf))
+        stdLatency = np.zeros((number_blocks,number_conf))
+
+        # Plotando com barras de erro vindas da outra série
+        space_between=5
+        for i in range(0,number_conf):     
+            xTicks[i]= i*space_between
+            categorias[i]= f"{df_csv.index[i]} Nodes"       
+            X[0][i] = i*space_between
+            X[1][i] = i*space_between+1
+            X[2][i] = i*space_between+2
+            X[3][i] = i*space_between+3 
+            avgLatency[0][i] = df_csv.iloc[i]['Avg_time_per_record1']
+            stdLatency[0][i] = df_csv.iloc[i]['Stdev_time_per_record1']    
+            avgLatency[1][i] = df_csv.iloc[i]['Avg_time_per_record2']
+            stdLatency[1][i] = df_csv.iloc[i]['Stdev_time_per_record2']
+            avgLatency[2][i] = df_csv.iloc[i]['Avg_time_per_record3']
+            stdLatency[2][i] = df_csv.iloc[i]['Stdev_time_per_record3']
+            avgLatency[3][i] = df_csv.iloc[i]['Avg_time_per_record4']
+            stdLatency[3][i] = df_csv.iloc[i]['Stdev_time_per_record4'] 
+           
+
+
+        plt.figure(figsize=(8,5))
+        for i in range(0,number_blocks):
+            if i == 0:
+                color='lightyellow'
+                label=f"Messagem de até 1 KB" 
+            elif i == 1:
+                color='lightgreen'
+                label=f"Messagem de até 128 KB" 
+            elif i == 2:
+                color='deepskyblue' 
+                label=f"Messagem de até {self.categories[2]} MB" 
+            else:
+                color='darkred' 
+                label=f"Messagem de até {self.categories[3]} MB" 
+                     
+            plt.bar(X[i], avgLatency[i], yerr=stdLatency[i], label=label, width=0.9,capsize=8, color=color, edgecolor='black') 
+
+       
+        plt.yscale("log")
+        plt.xticks(xTicks, categorias)
+        plt.ylabel('Tempo médio(s) do envio em escala logaritmica')
+        plt.title(f'Tempo médio do envio por tamanho da mensagem no ambiente {plotLabel} com erro padrão')
         plt.grid(True, axis='y', linestyle='--', alpha=0.5)
         plt.tight_layout()     
         plt.legend()  
@@ -486,9 +545,9 @@ class MyPlot(object):
 
         # # Scatter plot
         jitter_x = np.array(diffs1) + (np.random.rand(len(diffs1)) - 0.5) * 0.1  # Adiciona um pequeno jitter no eixo y
-        plt.scatter( jitter_x,sizes1, color="green", label="Sem concorrencia", s=10, alpha=0.7, edgecolors='k')
+        plt.scatter( jitter_x,sizes1, color="green", label="Melhor caso com 2 nós", s=10, alpha=0.7, edgecolors='k')
         jitter_y = np.array(sizes2) + (np.random.rand(len(sizes2)) - 0.5)  # Adiciona um pequeno jitter no eixo x
-        plt.scatter(diffs2, jitter_y,  color="red",  label="Com concorrencia", s=10, alpha=0.7, edgecolors='k')
+        plt.scatter(diffs2, jitter_y,  color="yellow",  label="Pior caso com 32 nós", s=10, alpha=0.7, edgecolors='k')
 
         plt.title("Tempo envio x tamanho do Buffer no "+ displotLabel )
         plt.xlabel("Tempo de envio (s)")
