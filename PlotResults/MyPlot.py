@@ -128,32 +128,32 @@ class MyPlot(object):
                     self.df_master=pd.read_csv(os.path.join(self.base_directory , str(experiment+1), "mpiio-master.log"),header=None)    
                     for k in range(len(self.df_master)):           
 
-                    rank = self.df_master.iloc[k,0]
-                    seq = self.df_master.iloc[k,1]           
-                    time = self.df_master.iloc[k,2] 
-                    time2= self.df_master.iloc[k,6]
-                
-                    try:
-                        scenario = self.dicionarioScenarios.get((rank,seq))[0]
-                        file = self.dicionarioScenarios.get((rank,seq))[1] 
-                        if self.X1[scenario][file][seq]:
-                            if file in self.X3[scenario]:
-                                if seq in self.X3[scenario][file] and self.X3[scenario][file][seq] > time:
-                                    continue
-                                else: 
+                        rank = self.df_master.iloc[k,0]
+                        seq = self.df_master.iloc[k,1]           
+                        time = self.df_master.iloc[k,2] 
+                        time2= self.df_master.iloc[k,6]
+                    
+                        try:
+                            scenario = self.dicionarioScenarios.get((rank,seq))[0]
+                            file = self.dicionarioScenarios.get((rank,seq))[1] 
+                            if self.X1[scenario][file][seq]:
+                                if file in self.X3[scenario]:
+                                    if seq in self.X3[scenario][file] and self.X3[scenario][file][seq] > time:
+                                        continue
+                                    else: 
+                                        self.X3[scenario][file][seq]=time
+                                        self.X4[scenario][file][seq]=time2
+                                else:
+                                    self.X3[scenario][file]={}
                                     self.X3[scenario][file][seq]=time
+                                    self.X4[scenario][file]={}
                                     self.X4[scenario][file][seq]=time2
-                            else:
-                                self.X3[scenario][file]={}
-                                self.X3[scenario][file][seq]=time
-                                self.X4[scenario][file]={}
-                                self.X4[scenario][file][seq]=time2
-                    except KeyError:
-                        #print(f"KeyError {scenario} {file} {seq}")
-                        continue   
-                    except TypeError:
-                        #print(f"TypeError {scenario} {file} {seq}")
-                        continue
+                        except KeyError:
+                            #print(f"KeyError {scenario} {file} {seq}")
+                            continue   
+                        except TypeError:
+                            #print(f"TypeError {scenario} {file} {seq}")
+                            continue
                 
                 for i in range(self.number_scenarios):    
                     scenario = i+1        
