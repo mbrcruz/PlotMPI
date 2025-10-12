@@ -83,8 +83,9 @@ class MyPlot(object):
                 initial_rank = 2
 
                 for i in range(self.number_nodes * self.number_scenarios_per_nodes):
-                    rank= initial_rank +i        
-                    print(f'Loading Processes {i+1}')
+                    rank= initial_rank +i      
+                    if number_experiments == 1 or filter_experiment != 0:  
+                        print(f'Loading Processes {i+1}')
                     df= pd.read_csv(os.path.join(self.base_directory, str(experiment+1),  f"mpiio-{rank}.log"),header=None)
                         
                     if ( self.start_moment > df.iloc[0,5] ):
@@ -92,6 +93,7 @@ class MyPlot(object):
                 
                     for k in range(len(df)):
                         self.numberBuffers += 1
+                        stage = df.iloc[k,1]
                         scenario = df.iloc[k,2]
                         file = df.iloc[k,3]
                         block = df.iloc[k,4] 
@@ -104,7 +106,7 @@ class MyPlot(object):
                            continue
                         else:
                             if filter_scenario == 0 or scenario == filter_scenario:     
-                                        record= { "experiment": experiment+1, "scenario": scenario, 'file': file, 'block': block, 'sizeBytes': size  , 'timeSec': diff , "rank": rank }   
+                                        record= { "experiment": experiment+1, "scenario": scenario, "stage":stage, 'file': file, 'block': block, 'sizeBytes': size  , 'timeSec': diff , "rank": rank }   
                                         self.records.append(record)  
                                         #separating records by size categories   
                                         if size / (1024 * 1024) < self.categories[0]:
@@ -120,7 +122,7 @@ class MyPlot(object):
                     for k in range(len(self.df_times)):
                         if  self.df_times.iloc[k,0] == "Simulation":
                             self.Simulations.append(float(self.df_times.iloc[k,1]))   
-                                         
+
         print(f'Number of Records: {len(self.records)}')             
 
     def show_config(self):
