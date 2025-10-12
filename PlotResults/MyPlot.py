@@ -124,36 +124,36 @@ class MyPlot(object):
                         if  self.df_times.iloc[k,0] == "Simulation":
                             self.Simulations.append(float(self.df_times.iloc[k,1]))
                 
-                if ( os.path.exists(os.path.join(self.base_directory , str(experiment+1), "mpiio-master.log"))):
-                    self.df_master=pd.read_csv(os.path.join(self.base_directory , str(experiment+1), "mpiio-master.log"),header=None)    
-                    for k in range(len(self.df_master)):           
+                # if ( os.path.exists(os.path.join(self.base_directory , str(experiment+1), "mpiio-master.log"))):
+                #     self.df_master=pd.read_csv(os.path.join(self.base_directory , str(experiment+1), "mpiio-master.log"),header=None)    
+                #     for k in range(len(self.df_master)):           
 
-                        rank = self.df_master.iloc[k,0]
-                        seq = self.df_master.iloc[k,1]           
-                        time = self.df_master.iloc[k,2] 
-                        time2= self.df_master.iloc[k,6]
+                #         rank = self.df_master.iloc[k,0]
+                #         seq = self.df_master.iloc[k,1]           
+                #         time = self.df_master.iloc[k,2] 
+                #         time2= self.df_master.iloc[k,6]
                     
-                        try:
-                            scenario = self.dicionarioScenarios.get((rank,seq))[0]
-                            file = self.dicionarioScenarios.get((rank,seq))[1] 
-                            if self.X1[scenario][file][seq]:
-                                if file in self.X3[scenario]:
-                                    if seq in self.X3[scenario][file] and self.X3[scenario][file][seq] > time:
-                                        continue
-                                    else: 
-                                        self.X3[scenario][file][seq]=time
-                                        self.X4[scenario][file][seq]=time2
-                                else:
-                                    self.X3[scenario][file]={}
-                                    self.X3[scenario][file][seq]=time
-                                    self.X4[scenario][file]={}
-                                    self.X4[scenario][file][seq]=time2
-                        except KeyError:
-                            #print(f"KeyError {scenario} {file} {seq}")
-                            continue   
-                        except TypeError:
-                            #print(f"TypeError {scenario} {file} {seq}")
-                            continue
+                #         try:
+                #             scenario = self.dicionarioScenarios.get((rank,seq))[0]
+                #             file = self.dicionarioScenarios.get((rank,seq))[1] 
+                #             if self.X1[scenario][file][seq]:
+                #                 if file in self.X3[scenario]:
+                #                     if seq in self.X3[scenario][file] and self.X3[scenario][file][seq] > time:
+                #                         continue
+                #                     else: 
+                #                         self.X3[scenario][file][seq]=time
+                #                         self.X4[scenario][file][seq]=time2
+                #                 else:
+                #                     self.X3[scenario][file]={}
+                #                     self.X3[scenario][file][seq]=time
+                #                     self.X4[scenario][file]={}
+                #                     self.X4[scenario][file][seq]=time2
+                #         except KeyError:
+                #             #print(f"KeyError {scenario} {file} {seq}")
+                #             continue   
+                #         except TypeError:
+                #             #print(f"TypeError {scenario} {file} {seq}")
+                #            continue
                 
                 for i in range(self.number_scenarios):    
                     scenario = i+1        
@@ -405,7 +405,7 @@ class MyPlot(object):
     
     def plotBlocks(self,base_directory,plotLabel,number_blocks=4):
         
-        df_csv = pd.read_csv(os.path.join(base_directory,"../plot.csv"),index_col='Nodes')
+        df_csv = pd.read_csv(os.path.join(base_directory,"plot.csv"),index_col='Nodes')
         number_conf = len(df_csv)
         categorias =  np.empty(number_conf, dtype=object)       
         xTicks = np.zeros(number_conf)      
@@ -486,7 +486,7 @@ class MyPlot(object):
         # Plotando com barras de erro vindas da outra série
         plt.figure(figsize=(8,5))      
         plt.bar(X , AvgSimulation, yerr=Stdev_simulation, label="Computação", width=largura, color='lightgreen', edgecolor='black') 
-        plt.bar(X , Avg_time_per_process, bottom=AvgSimulation, label="Comunicação", width=largura, color='blue', edgecolor='black') 
+        plt.bar(X , Avg_time_per_process, bottom=AvgSimulation, label="E/S", width=largura, color='red', edgecolor='black') 
         #plt.bar(X , Avg_time_per_process, label="Comunicação", width=largura, color='blue', edgecolor='black') 
 
         plt.xticks(X, categorias)
