@@ -69,8 +69,7 @@ class MyPlot(object):
             and not self.typeEvaluation == TypeEvaluation.JUST_SEND):          
                 raise Exception("Bad configuration.")
     
-        for experiment in range(number_experiments):        
-            
+        for experiment in range(number_experiments): 
             
             if filter_experiment == 0 or filter_experiment == experiment+1:
                 print(f'Loading Experiment {experiment+1}')
@@ -95,105 +94,16 @@ class MyPlot(object):
                         self.numberBuffers += 1
                         scenario = df.iloc[k,2]
                         file = df.iloc[k,3]
-                        seq = df.iloc[k,4] 
+                        block = df.iloc[k,4] 
                         time = df.iloc[k,5]
                         time2 = df.iloc[k,6]
                         size = df.iloc[k,8]
+                        diff= time2 - time
                         
                         if self.onlyRemote and i < self.number_scenarios_per_nodes:
-                            if scenario not in self.localScenarios:
-                                self.localScenarios.append(scenario)                       
-                        if file in self.X1[scenario]:
-                            if seq in self.X1[scenario][file] and self.X1[scenario][file][seq] < time:
-                                continue
-                            else: 
-                                self.X1[scenario][file][seq]=  ( time , size , rank)                       
-                                self.X2[scenario][file][seq]= ( time2 , size , rank)  
-                                self.dicionarioScenarios[(i+1,seq)]= (scenario,file)
+                           continue
                         else:
-                            self.X1[scenario][file]={}
-                            self.X1[scenario][file][seq]= ( time , size , rank)                   
-                            self.X2[scenario][file]={}
-                            self.X2[scenario][file][seq]= ( time2 , size ,rank ) 
-                            self.dicionarioScenarios[(i+1,seq)]= (scenario,file)
-
-
-                    
-                    self.df_times= pd.read_csv(os.path.join(self.base_directory , str(experiment+1), f"sddptimer{rank:04d}.log"),header=None)
-                    for k in range(len(self.df_times)):
-                        if  self.df_times.iloc[k,0] == "Simulation":
-                            self.Simulations.append(float(self.df_times.iloc[k,1]))
-                
-                # if ( os.path.exists(os.path.join(self.base_directory , str(experiment+1), "mpiio-master.log"))):
-                #     self.df_master=pd.read_csv(os.path.join(self.base_directory , str(experiment+1), "mpiio-master.log"),header=None)    
-                #     for k in range(len(self.df_master)):           
-
-                #         rank = self.df_master.iloc[k,0]
-                #         seq = self.df_master.iloc[k,1]           
-                #         time = self.df_master.iloc[k,2] 
-                #         time2= self.df_master.iloc[k,6]
-                    
-                #         try:
-                #             scenario = self.dicionarioScenarios.get((rank,seq))[0]
-                #             file = self.dicionarioScenarios.get((rank,seq))[1] 
-                #             if self.X1[scenario][file][seq]:
-                #                 if file in self.X3[scenario]:
-                #                     if seq in self.X3[scenario][file] and self.X3[scenario][file][seq] > time:
-                #                         continue
-                #                     else: 
-                #                         self.X3[scenario][file][seq]=time
-                #                         self.X4[scenario][file][seq]=time2
-                #                 else:
-                #                     self.X3[scenario][file]={}
-                #                     self.X3[scenario][file][seq]=time
-                #                     self.X4[scenario][file]={}
-                #                     self.X4[scenario][file][seq]=time2
-                #         except KeyError:
-                #             #print(f"KeyError {scenario} {file} {seq}")
-                #             continue   
-                #         except TypeError:
-                #             #print(f"TypeError {scenario} {file} {seq}")
-                #            continue
-                
-                for i in range(self.number_scenarios):    
-                    scenario = i+1        
-                    
-                    tdiff = 0                  
-                    last_x1=0
-                    if scenario in self.localScenarios:     
-                        print( f"Ignoring local scenario {scenario} ...")         
-                        continue
-                    else:
-                        print( f"Computing scenario {scenario} ...")                  
-                        for file in self.X1[scenario]:
-                            for block in self.X1[scenario][file]:               
-                                x1 = ( self.X1[scenario][file][block][0] - self.start_moment )  
-                                size = self.X1[scenario][file][block][1]
-                                rank = self.X1[scenario][file][block][2]
-
-                                try:                    
-                                    x2 = ( self.X2[scenario][file][block][0] - self.start_moment )  
-                                    #x3 = ( self.X3[scenario][file][block] - self.start_moment )
-                                    #x4 = ( self.X4[scenario][file][block] - self.start_moment )                                      
-                                except KeyError:
-                                    print(f"KeyError {scenario} {file} {block}")
-                                    exit(-1)   
-                                diff = 0 
-                                diff= x2 - x1
-                                # if self.typeEvaluation == TypeEvaluation.JUST_SEND:                                    
-                                # elif self.typeEvaluation == TypeEvaluation.JUST_COMUNICATION:
-                                #     #diff= (x3 - x1)
-                                # else:
-                                #     #diff= (x4 - x3 ) + ( x2 - x1)                                                
-                                if diff < 0:                           
-                                    if scenario not in self.badScenarios: 
-                                        print(f"Diff is zero or negative: {diff} for {scenario} {file} {block}")  
-                                        self.badScenarios.append(scenario)     
-                                    continue              
-                                else:                  
-                                    # The following elifs were empty and are removed for clarity
-                                    # If you want to add logic for sizeMB ranges, add code here
-                                    if filter_scenario == 0 or scenario == filter_scenario:     
+                            if filter_scenario == 0 or scenario == filter_scenario:     
                                         record= { "experiment": experiment+1, "scenario": scenario, 'file': file, 'block': block, 'sizeBytes': size  , 'timeSec': diff , "rank": rank }   
                                         self.records.append(record)  
                                         #separating records by size categories   
@@ -204,7 +114,14 @@ class MyPlot(object):
                                         elif size / (1024 * 1024)< self.categories[2]: 
                                             self.records3.append(record)
                                         else:
-                                            self.records4.append(record)                      
+                                            self.records4.append(record)  
+
+                    self.df_times= pd.read_csv(os.path.join(self.base_directory , str(experiment+1), f"sddptimer{rank:04d}.log"),header=None)
+                    for k in range(len(self.df_times)):
+                        if  self.df_times.iloc[k,0] == "Simulation":
+                            self.Simulations.append(float(self.df_times.iloc[k,1]))   
+                                         
+        print(f'Number of Records: {len(self.records)}')             
 
     def show_config(self):
         print( f" Number Scenario {self.number_scenarios}")
