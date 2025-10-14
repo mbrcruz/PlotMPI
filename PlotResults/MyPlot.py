@@ -268,31 +268,31 @@ class MyPlot(object):
             writer.writerow(linha)
             arquivo_csv.close()      
             
-    # def plotBandwidth(self,base_directory,plotLabel):
+    def plotBandwidth(self,base_directory,plotLabel):
         
-    #     df_csv = pd.read_csv(os.path.join(base_directory,"../plot.csv"),index_col='Nodes')
-    #     df_len = len(df_csv)
-    #     X = np.zeros(df_len)
-    #     categorias =  np.empty(df_len, dtype=object)
-    #     avgBandwidth = np.zeros(df_len)
-    #     stdDevBandwidth = np.zeros(df_len)
+        df_csv = pd.read_csv(os.path.join(base_directory,"../plot.csv"),index_col='Nodes')
+        df_len = len(df_csv)
+        X = np.zeros(df_len)
+        categorias =  np.empty(df_len, dtype=object)
+        avgBandwidth = np.zeros(df_len)
+        stdDevBandwidth = np.zeros(df_len)
         
-    #     for i in range(len(df_csv)):
-    #         X[i]= i
-    #         categorias[i]= f"{df_csv.index[i]} Nodes"
-    #         avgBandwidth[i]= df_csv.iloc[i]['Avg_bandwidth']
-    #         stdDevBandwidth[i]= df_csv.iloc[i]['Stddev_bandwidth']
-    #     # Plotando com barras de erro vindas da outra série
-    #     plt.figure(figsize=(8,5))      
-    #     plt.bar(X, avgBandwidth, yerr=stdDevBandwidth, label="Banda Gb/s", capsize=8, color='lightgreen', edgecolor='black') 
+        for i in range(len(df_csv)):
+            X[i]= i
+            categorias[i]= f"{df_csv.index[i]} Nodes"
+            avgBandwidth[i]= df_csv.iloc[i]['Avg_bandwidth']
+            stdDevBandwidth[i]= df_csv.iloc[i]['Stddev_bandwidth']
+        # Plotando com barras de erro vindas da outra série
+        plt.figure(figsize=(8,5))      
+        plt.bar(X, avgBandwidth, yerr=stdDevBandwidth, label="Banda Gb/s", capsize=8, color='lightgreen', edgecolor='black') 
 
-    #     plt.xticks(X, categorias)
-    #     plt.ylabel('Banda Média')
-    #     plt.title(f'Banda média por envio de cenário no {plotLabel} com erro padrão')
-    #     plt.grid(True, axis='y', linestyle='--', alpha=0.5)
-    #     plt.tight_layout()     
-    #     plt.legend()  
-    #     plt.show()
+        plt.xticks(X, categorias)
+        plt.ylabel('Banda Média')
+        plt.title(f'Banda média {plotLabel} com erro padrão')
+        plt.grid(True, axis='y', linestyle='--', alpha=0.5)
+        plt.tight_layout()     
+        plt.legend()  
+        plt.show()
 
     def plotScenarios(self,base_directory,plotLabel):
         
