@@ -227,9 +227,10 @@ class MyPlot(object):
         bandwidth_per_scenario = ( agrupados["sizeBytes"] * 8 / 1000000000 ) / agrupados["timeSec"]  # em Gb/s
         avg_bandwidth = bandwidth_per_scenario.mean()
         stddev_bandwidth = bandwidth_per_scenario.std()
+        size_por_scenario = agrupados["sizeBytes"].mean() / 1000000 # em GB
         # total_size_per_nodes = statistics.mean(self.sizesPerScenario.values()) * self.number_scenarios_per_nodes/ 1000000000
-        # print(f'AVG size Scenario (MB): {avg_size:.2f}') 
-        # print(f'Total size per node (GB): {total_size_per_nodes:.2f}') 
+        total_size_per_nodes= size_por_scenario * self.number_scenarios_per_nodes # em GB
+        print(f'Total Size per Node (GB): {total_size_per_nodes:.2f        
         print(f'AVG Bandwidth per scenario (Gb/s): {avg_bandwidth:.2f}') 
         print(f'Stdev Bandwidth per scenario (Gb/s): {stddev_bandwidth:.2f}')
         print("Writing CSV file...")
