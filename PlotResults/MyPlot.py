@@ -297,17 +297,16 @@ class MyPlot(object):
         fig, ax1 = plt.subplots()
         # Plotando com barras de erro vindas da outra série
         plt.figure(figsize=(8,5))      
-        ax1.bar(X, avgBandwidth, yerr=stdDevBandwidth, label="Banda Gb/s", capsize=8, color='lightgreen', edgecolor='black') 
-        ax1.xticks(X, categorias)
-        ax1.ylabel('Banda Média')
-        ax1.title(f'Banda média {plotLabel} com erro padrão')
+        ax1.bar(X, avgBandwidth, yerr=stdDevBandwidth, label="Banda Gb/s", capsize=8, color='lightgreen', edgecolor='black')         
+        ax1.set_ylabel('Banda Média')
+        #ax1.title(f'Banda média {plotLabel} com erro padrão')
 
         
         ax2 = ax1.twinx()
-        ax2.bar(X, avgBandwidth, yerr=stdDevBandwidth, label="Volume de dados por nó em GB", capsize=8, color='blue', edgecolor='black') 
-        ax2.xticks(X, categorias)
-        ax2.ylabel('Volume de dados por nó em GB')
-        
+        ax2.bar(X, avgBandwidth, yerr=stdDevBandwidth, label="Volume de dados por nó em GB", capsize=8, color='blue', edgecolor='black')         
+        ax2.set_ylabel('Volume de dados por nó em GB')
+
+        plt.xticks(X, categorias)        
         plt.grid(True, axis='y', linestyle='--', alpha=0.5)
         plt.tight_layout()     
         plt.legend()  
