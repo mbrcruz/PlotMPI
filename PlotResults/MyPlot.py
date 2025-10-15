@@ -227,24 +227,24 @@ class MyPlot(object):
         bandwidth_per_scenario = ( agrupados["sizeBytes"] * 8 / 1000000000 ) / agrupados["timeSec"]  # em Gb/s
         avg_bandwidth = bandwidth_per_scenario.mean()
         stddev_bandwidth = bandwidth_per_scenario.std()
-        size_por_scenario = agrupados["sizeBytes"].mean() / 1000000 # em GB
+        size_por_scenario = agrupados["sizeBytes"].mean() / 1000000000 # em GB
         # total_size_per_nodes = statistics.mean(self.sizesPerScenario.values()) * self.number_scenarios_per_nodes/ 1000000000
-        total_size_per_nodes= size_por_scenario * self.number_scenarios_per_nodes # em GB
-        print(f'Total Size per Node (GB): {total_size_per_nodes:.2f        
+        total_size_per_nodes= ( size_por_scenario * self.number_scenarios)/  self.number_scenarios_per_nodes * self.number_nodes # em GB
+        print(f'Total Size per Node (GB): {total_size_per_nodes:.2f}')        
         print(f'AVG Bandwidth per scenario (Gb/s): {avg_bandwidth:.2f}') 
         print(f'Stdev Bandwidth per scenario (Gb/s): {stddev_bandwidth:.2f}')
         print("Writing CSV file...")
-        self.escreveCsv({ 'Nodes': self.number_nodes, 
-                            'Avg_Simulation': avg_simulation , 'Stdev_simulation': stdev_simulation,
-                            'Avg_comunication_time_per_process': avg_per_process, 'std_per_process': std_per_process,
-                            'Avg_time_per_scenario': avg_time_per_scenario ,'Stdev_time_per_scenario': stdev_time_per_scenario,
-                            'Avg_bandwidth': avg_bandwidth, 'Stddev_bandwidth': stddev_bandwidth,
-                            'worstScenario': self.worstScenario, 'max_time_per_scenario': max_time_per_scenario,
-                            'bestScenario': self.bestScenario, 'min_time_per_scenario': min_time_per_scenario ,
-                            'Avg_time_per_record1': Avg_time_per_record1 ,'Stdev_time_per_record1': Stdev_time_per_record1,
-                            'Avg_time_per_record2': Avg_time_per_record2 ,'Stdev_time_per_record2': Stdev_time_per_record2,
-                            'Avg_time_per_record3': Avg_time_per_record3 ,'Stdev_time_per_record3': Stdev_time_per_record3,
-                            'Avg_time_per_record4': Avg_time_per_record4 ,'Stdev_time_per_record4': Stdev_time_per_record4 } )  
+        # self.escreveCsv({ 'Nodes': self.number_nodes, 
+        #                     'Avg_Simulation': avg_simulation , 'Stdev_simulation': stdev_simulation,
+        #                     'Avg_comunication_time_per_process': avg_per_process, 'std_per_process': std_per_process,
+        #                     'Avg_time_per_scenario': avg_time_per_scenario ,'Stdev_time_per_scenario': stdev_time_per_scenario,
+        #                     'Avg_bandwidth': avg_bandwidth, 'Stddev_bandwidth': stddev_bandwidth,
+        #                     'worstScenario': self.worstScenario, 'max_time_per_scenario': max_time_per_scenario,
+        #                     'bestScenario': self.bestScenario, 'min_time_per_scenario': min_time_per_scenario ,
+        #                     'Avg_time_per_record1': Avg_time_per_record1 ,'Stdev_time_per_record1': Stdev_time_per_record1,
+        #                     'Avg_time_per_record2': Avg_time_per_record2 ,'Stdev_time_per_record2': Stdev_time_per_record2,
+        #                     'Avg_time_per_record3': Avg_time_per_record3 ,'Stdev_time_per_record3': Stdev_time_per_record3,
+        #                     'Avg_time_per_record4': Avg_time_per_record4 ,'Stdev_time_per_record4': Stdev_time_per_record4 } )  
         
 
     def escreveCsv(self,linha):
@@ -271,25 +271,43 @@ class MyPlot(object):
             
     def plotBandwidth(self,base_directory,plotLabel):
         
+
+
+        df= pd.DataFrame(self.records)
+        agrupados = df.groupby("scenario")[["sizeBytes"]].sum()        
+        size_por_scenario = agrupados["sizeBytes"].mean() / 1000000000 # em GB        
+        
+        
         df_csv = pd.read_csv(os.path.join(base_directory,"../plot.csv"),index_col='Nodes')
         df_len = len(df_csv)
         X = np.zeros(df_len)
         categorias =  np.empty(df_len, dtype=object)
         avgBandwidth = np.zeros(df_len)
         stdDevBandwidth = np.zeros(df_len)
+        sizePerNode = np.zeros(df_len)
         
         for i in range(len(df_csv)):
             X[i]= i
             categorias[i]= f"{df_csv.index[i]} Nodes"
             avgBandwidth[i]= df_csv.iloc[i]['Avg_bandwidth']
             stdDevBandwidth[i]= df_csv.iloc[i]['Stddev_bandwidth']
+            total_size_per_nodes= ( size_por_scenario * self.number_scenarios)/  self.number_scenarios_per_nodes *  (i+1 )**2
+            sizePerNode[i]= total_size_per_nodes
+        
+        fig, ax1 = plt.subplots()
         # Plotando com barras de erro vindas da outra série
         plt.figure(figsize=(8,5))      
-        plt.bar(X, avgBandwidth, yerr=stdDevBandwidth, label="Banda Gb/s", capsize=8, color='lightgreen', edgecolor='black') 
+        ax1.bar(X, avgBandwidth, yerr=stdDevBandwidth, label="Banda Gb/s", capsize=8, color='lightgreen', edgecolor='black') 
+        ax1.xticks(X, categorias)
+        ax1.ylabel('Banda Média')
+        ax1.title(f'Banda média {plotLabel} com erro padrão')
 
-        plt.xticks(X, categorias)
-        plt.ylabel('Banda Média')
-        plt.title(f'Banda média {plotLabel} com erro padrão')
+        
+        ax2 = ax1.twinx()
+        ax2.bar(X, avgBandwidth, yerr=stdDevBandwidth, label="Volume de dados por nó em GB", capsize=8, color='blue', edgecolor='black') 
+        ax2.xticks(X, categorias)
+        ax2.ylabel('Volume de dados por nó em GB')
+        
         plt.grid(True, axis='y', linestyle='--', alpha=0.5)
         plt.tight_layout()     
         plt.legend()  
