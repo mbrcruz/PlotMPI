@@ -39,6 +39,8 @@ class MyPlot(object):
         self.X4=[]
         self.records=[]
         self.Simulations=[]
+        self.df_mpiOpenTimes=[]
+        self.mpiOpenTimes=[]
         self.localScenarios=[]   
         self.bestScenario=0
         self.worstScenario=0 
@@ -122,6 +124,12 @@ class MyPlot(object):
                     for k in range(len(self.df_times)):
                         if  self.df_times.iloc[k,0] == "Simulation":
                             self.Simulations.append(float(self.df_times.iloc[k,1]))   
+                    self.df_mpiOpenTimes= pd.read_csv(os.path.join(self.base_directory , str(experiment+1), f"mpiio-open-{rank}.log"),header=None)
+                    for k in range(len(self.df_mpiOpenTimes)):
+                        mpiopenDiff= self.df_mpiOpenTimes.iloc[k,3] - self.df_mpiOpenTimes.iloc[k,2]
+                        mpiOpenTimeRecord={}
+                        mpiOpenTimeRecord= { "experiment": experiment+1, 'timeSec': mpiopenDiff , "rank": rank }  
+                        self.mpiOpenTimes.append(mpiOpenTimeRecord)  
 
         print(f'Number of Records: {len(self.records)}')             
 
@@ -234,17 +242,17 @@ class MyPlot(object):
         print(f'AVG Bandwidth per scenario (Gb/s): {avg_bandwidth:.2f}') 
         print(f'Stdev Bandwidth per scenario (Gb/s): {stddev_bandwidth:.2f}')
         print("Writing CSV file...")
-        # self.escreveCsv({ 'Nodes': self.number_nodes, 
-        #                     'Avg_Simulation': avg_simulation , 'Stdev_simulation': stdev_simulation,
-        #                     'Avg_comunication_time_per_process': avg_per_process, 'std_per_process': std_per_process,
-        #                     'Avg_time_per_scenario': avg_time_per_scenario ,'Stdev_time_per_scenario': stdev_time_per_scenario,
-        #                     'Avg_bandwidth': avg_bandwidth, 'Stddev_bandwidth': stddev_bandwidth,
-        #                     'worstScenario': self.worstScenario, 'max_time_per_scenario': max_time_per_scenario,
-        #                     'bestScenario': self.bestScenario, 'min_time_per_scenario': min_time_per_scenario ,
-        #                     'Avg_time_per_record1': Avg_time_per_record1 ,'Stdev_time_per_record1': Stdev_time_per_record1,
-        #                     'Avg_time_per_record2': Avg_time_per_record2 ,'Stdev_time_per_record2': Stdev_time_per_record2,
-        #                     'Avg_time_per_record3': Avg_time_per_record3 ,'Stdev_time_per_record3': Stdev_time_per_record3,
-        #                     'Avg_time_per_record4': Avg_time_per_record4 ,'Stdev_time_per_record4': Stdev_time_per_record4 } )  
+        self.escreveCsv({ 'Nodes': self.number_nodes, 
+                            'Avg_Simulation': avg_simulation , 'Stdev_simulation': stdev_simulation,
+                            'Avg_comunication_time_per_process': avg_per_process, 'std_per_process': std_per_process,
+                            'Avg_time_per_scenario': avg_time_per_scenario ,'Stdev_time_per_scenario': stdev_time_per_scenario,
+                            'Avg_bandwidth': avg_bandwidth, 'Stddev_bandwidth': stddev_bandwidth,
+                            'worstScenario': self.worstScenario, 'max_time_per_scenario': max_time_per_scenario,
+                            'bestScenario': self.bestScenario, 'min_time_per_scenario': min_time_per_scenario ,
+                            'Avg_time_per_record1': Avg_time_per_record1 ,'Stdev_time_per_record1': Stdev_time_per_record1,
+                            'Avg_time_per_record2': Avg_time_per_record2 ,'Stdev_time_per_record2': Stdev_time_per_record2,
+                            'Avg_time_per_record3': Avg_time_per_record3 ,'Stdev_time_per_record3': Stdev_time_per_record3,
+                            'Avg_time_per_record4': Avg_time_per_record4 ,'Stdev_time_per_record4': Stdev_time_per_record4 } )  
         
 
     def escreveCsv(self,linha):
@@ -273,7 +281,50 @@ class MyPlot(object):
         
 
 
-        df= pd.DataFrame(self.records)
+        df = pd.DataFrame(self.records)
+
+        # calcula tamanho médio por cenário (GB)
+        agrupados = df.groupby("scenario")[["sizeBytes"]].sum()
+        size_por_scenario = agrupados["sizeBytes"].mean() / 1e9
+
+        # carrega CSV com métricas por configuração
+        df_csv = pd.read_csv(os.path.join(base_directory, "../plot.csv"), index_col='Nodes')
+        df_len = len(df_csv)
+        X = np.arange(df_len)
+        categorias = [f"{n} Nodes" for n in df_csv.index]
+        avgBandwidth = df_csv['Avg_bandwidth'].to_numpy()
+        stdDevBandwidth = df_csv['Stddev_bandwidth'].to_numpy()
+
+        # calcula volume de dados por nó (GB) para segunda eixo y
+        sizePerNode = np.zeros(df_len)
+        for i in range(df_len):
+            total_size_per_nodes = (size_por_scenario * self.number_scenarios) / 2 ** ( i+1)
+            sizePerNode[i] = total_size_per_nodes
+
+        # plot com dois eixos y
+        fig, ax1 = plt.subplots(figsize=(8, 5))
+        ax1.bar(X, avgBandwidth, yerr=stdDevBandwidth, capsize=8, color='lightgreen', edgecolor='black', label='Banda (Gb/s)')
+        ax1.set_ylabel('Banda média (Gb/s)', color='green')
+        ax1.set_xlabel('Configuração')
+        ax1.set_xticks(X)
+        ax1.set_xticklabels(categorias)
+        ax1.grid(True, axis='y', linestyle='--', alpha=0.5)
+        ax1.set_ylim(bottom=0)
+
+        ax2 = ax1.twinx()
+        ax2.plot(X, sizePerNode, color='blue', marker='o', linewidth=2, label='Volume de dados por nó (GB)')        
+        ax2.set_ylim(bottom=0)
+        ax2.set_ylabel('Volume de dados por nó (GB)', color='blue')
+
+        # combinando legendas
+        h1, l1 = ax1.get_legend_handles_labels()
+        h2, l2 = ax2.get_legend_handles_labels()
+        ax1.legend(h1 + h2, l1 + l2, loc='upper left')
+
+        plt.title(f'Banda média e Volume por nó - {plotLabel}')
+        plt.tight_layout()
+        plt.show()
+        return
         agrupados = df.groupby("scenario")[["sizeBytes"]].sum()        
         size_por_scenario = agrupados["sizeBytes"].mean() / 1000000000 # em GB        
         
@@ -451,10 +502,11 @@ class MyPlot(object):
         # Formata os ticks como números decimais normais
         ax.xaxis.set_major_formatter(ScalarFormatter())
         ax.ticklabel_format(style='plain', axis='x')   # evita notação científica
-        plt.title('Histograma do tamanho das mensagens enviadas')
+        plt.title('Histograma do tamanho das mensagens enviadas dentro de 1 cenário.')
         plt.xlabel('Tamanho (KBytes) em escala logarítmica')
         plt.ylabel('Frequência')
-        plt.xscale('log')     
+        plt.xscale('log')  
+        plt.yscale('log')   
         #plt.xlim(left=0.6, right=50000)
         #plt.xticks([1, 1000, 10000, 20000,30000,50000])
         ticks = [1, 1000, 50000]
