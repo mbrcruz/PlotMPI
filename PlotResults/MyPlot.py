@@ -152,7 +152,8 @@ class MyPlot(object):
         df2= pd.DataFrame(self.records2)
         df3= pd.DataFrame(self.records3)
         df4= pd.DataFrame(self.records4)
-        self.df_mpiOpenTimes= pd.DataFrame(self.mpiOpenTimes)
+        if self.mpiOpenTimes is not None:
+            self.df_mpiOpenTimes= pd.DataFrame(self.mpiOpenTimes)
 
         sum_scenarios= df.groupby(["experiment","scenario"])["timeSec"].sum()
 
