@@ -239,17 +239,11 @@ class MyPlot(object):
         agrupados = df.groupby("scenario")[["sizeBytes","timeSec"]].sum()
         size_por_scenario = agrupados["sizeBytes"].mean() / 1000000000 # em GB
 
-        # banda agregada em janelas de 60s (soma de todos os ranks)
-        window_sec = 300
-        df_bw = df[['experiment', 'time_start', 'sizeBytes']].copy()
-        exp_start = df_bw.groupby('experiment')['time_start'].transform('min')
-        df_bw['window'] = ((df_bw['time_start'] - exp_start) // window_sec).astype(int)
-        bytes_per_window = df_bw.groupby(['experiment', 'window'])['sizeBytes'].sum()
-        bandwidth_per_window = bytes_per_window * 8 / 1e9 / window_sec  # Gb/s
-        avg_bw_per_experiment = bandwidth_per_window.groupby('experiment').mean()
-        avg_bandwidth = avg_bw_per_experiment.mean()
-        stddev_bandwidth = avg_bw_per_experiment.std()
-        print(f'Num windows ({window_sec}s): {bytes_per_window.groupby("experiment").count().mean():.0f}')
+        agrupados = df.groupby("scenario")[["sizeBytes","timeSec"]].sum()
+        bandwidth_per_scenario = ( agrupados["sizeBytes"] * 8 / 1000000000 ) / agrupados["timeSec"]  # em Gb/s
+        avg_bandwidth = bandwidth_per_scenario.mean()
+        stddev_bandwidth = bandwidth_per_scenario.std()
+        size_por_scenario = agrupados["sizeBytes"].mean() / 1000000000 # em GB
         # total_size_per_nodes = statistics.mean(self.sizesPerScenario.values()) * self.number_scenarios_per_nodes/ 1000000000
         total_size_per_nodes= ( size_por_scenario * self.number_scenarios)/  self.number_scenarios_per_nodes * self.number_nodes # em GB
         print(f'Total Size per Node (GB): {total_size_per_nodes:.2f}')        
