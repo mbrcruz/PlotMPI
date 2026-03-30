@@ -124,12 +124,13 @@ class MyPlot(object):
                     for k in range(len(self.df_times)):
                         if  self.df_times.iloc[k,0] == "Simulation":
                             self.Simulations.append(float(self.df_times.iloc[k,1]))   
-                    self.df_mpiOpenTimes= pd.read_csv(os.path.join(self.base_directory , str(experiment+1), f"mpiio-open-{rank}.log"),header=None)
-                    for k in range(len(self.df_mpiOpenTimes)):
-                        mpiopenDiff= self.df_mpiOpenTimes.iloc[k,3] - self.df_mpiOpenTimes.iloc[k,2]
-                        mpiOpenTimeRecord={}
-                        mpiOpenTimeRecord= { "experiment": experiment+1, 'timeSec': mpiopenDiff , "rank": rank }  
-                        self.mpiOpenTimes.append(mpiOpenTimeRecord)  
+                    if os.path.exists(os.path.join(self.base_directory , str(experiment+1), f"mpiio-open-{rank}.log")):
+                        self.df_mpiOpenTimes= pd.read_csv(os.path.join(self.base_directory , str(experiment+1), f"mpiio-open-{rank}.log"),header=None)
+                        for k in range(len(self.df_mpiOpenTimes)):
+                            mpiopenDiff= self.df_mpiOpenTimes.iloc[k,3] - self.df_mpiOpenTimes.iloc[k,2]
+                            mpiOpenTimeRecord={}
+                            mpiOpenTimeRecord= { "experiment": experiment+1, 'timeSec': mpiopenDiff , "rank": rank }  
+                            self.mpiOpenTimes.append(mpiOpenTimeRecord)  
 
         print(f'Number of Records: {len(self.records)}')             
 
@@ -151,6 +152,7 @@ class MyPlot(object):
         df2= pd.DataFrame(self.records2)
         df3= pd.DataFrame(self.records3)
         df4= pd.DataFrame(self.records4)
+        self.df_mpiOpenTimes= pd.DataFrame(self.mpiOpenTimes)
 
         sum_scenarios= df.groupby(["experiment","scenario"])["timeSec"].sum()
 
@@ -241,6 +243,17 @@ class MyPlot(object):
         print(f'Total Size per Node (GB): {total_size_per_nodes:.2f}')        
         print(f'AVG Bandwidth per scenario (Gb/s): {avg_bandwidth:.2f}') 
         print(f'Stdev Bandwidth per scenario (Gb/s): {stddev_bandwidth:.2f}')
+
+
+        sum_mpiopen= self.df_mpiOpenTimes.groupby(["experiment","rank"])["timeSec"].sum()
+        avg_mpiopen = sum_mpiopen.groupby("experiment").mean().mean()
+        stdev_mpiopen = sum_mpiopen.groupby("experiment").mean().std()      
+              
+        print(f'AVG MPIOpen (s): {avg_mpiopen:.2f}') 
+        print(f'Stdev MPIOpen (s)): {stdev_mpiopen:.2f}')        
+        
+        
+        
         print("Writing CSV file...")
         self.escreveCsv({ 'Nodes': self.number_nodes, 
                             'Avg_Simulation': avg_simulation , 'Stdev_simulation': stdev_simulation,
@@ -252,7 +265,9 @@ class MyPlot(object):
                             'Avg_time_per_record1': Avg_time_per_record1 ,'Stdev_time_per_record1': Stdev_time_per_record1,
                             'Avg_time_per_record2': Avg_time_per_record2 ,'Stdev_time_per_record2': Stdev_time_per_record2,
                             'Avg_time_per_record3': Avg_time_per_record3 ,'Stdev_time_per_record3': Stdev_time_per_record3,
-                            'Avg_time_per_record4': Avg_time_per_record4 ,'Stdev_time_per_record4': Stdev_time_per_record4 } )  
+                            'Avg_time_per_record4': Avg_time_per_record4 ,'Stdev_time_per_record4': Stdev_time_per_record4,
+                            "Avg_mpiopen": avg_mpiopen, 'Stdev_mpiopen': stdev_mpiopen
+                            } )  
         
 
     def escreveCsv(self,linha):
@@ -267,7 +282,8 @@ class MyPlot(object):
                      "Avg_time_per_record1", "Stdev_time_per_record1",
                      "Avg_time_per_record2", "Stdev_time_per_record2",
                      "Avg_time_per_record3", "Stdev_time_per_record3",
-                     "Avg_time_per_record4", "Stdev_time_per_record4"
+                     "Avg_time_per_record4", "Stdev_time_per_record4",
+                     "Avg_mpiopen", 'Stdev_mpiopen'
                      ]
         escrever_cabecalho = not os.path.exists(path_csv) or os.path.getsize(path_csv) == 0
         with open(path_csv,mode='a',newline='',encoding='utf-8') as arquivo_csv:
@@ -311,57 +327,57 @@ class MyPlot(object):
         ax1.grid(True, axis='y', linestyle='--', alpha=0.5)
         ax1.set_ylim(bottom=0)
 
-        ax2 = ax1.twinx()
-        ax2.plot(X, sizePerNode, color='blue', marker='o', linewidth=2, label='Volume de dados por nó (GB)')        
-        ax2.set_ylim(bottom=0)
-        ax2.set_ylabel('Volume de dados por nó (GB)', color='blue')
+        # ax2 = ax1.twinx()
+        # ax2.plot(X, sizePerNode, color='blue', marker='o', linewidth=2, label='Volume de dados por nó (GB)')        
+        # ax2.set_ylim(bottom=0)
+        # ax2.set_ylabel('Volume de dados por nó (GB)', color='blue')
 
-        # combinando legendas
-        h1, l1 = ax1.get_legend_handles_labels()
-        h2, l2 = ax2.get_legend_handles_labels()
-        ax1.legend(h1 + h2, l1 + l2, loc='upper left')
+        # # combinando legendas
+        # h1, l1 = ax1.get_legend_handles_labels()
+        # h2, l2 = ax2.get_legend_handles_labels()
+        # ax1.legend(h1 + h2, l1 + l2, loc='upper left')
 
-        plt.title(f'Banda média e Volume por nó - {plotLabel}')
+        #plt.title(f'Banda média por nó - {plotLabel}')
         plt.tight_layout()
         plt.show()
         return
-        agrupados = df.groupby("scenario")[["sizeBytes"]].sum()        
-        size_por_scenario = agrupados["sizeBytes"].mean() / 1000000000 # em GB        
+        # agrupados = df.groupby("scenario")[["sizeBytes"]].sum()        
+        # size_por_scenario = agrupados["sizeBytes"].mean() / 1000000000 # em GB        
         
         
-        df_csv = pd.read_csv(os.path.join(base_directory,"../plot.csv"),index_col='Nodes')
-        df_len = len(df_csv)
-        X = np.zeros(df_len)
-        categorias =  np.empty(df_len, dtype=object)
-        avgBandwidth = np.zeros(df_len)
-        stdDevBandwidth = np.zeros(df_len)
-        sizePerNode = np.zeros(df_len)
+        # df_csv = pd.read_csv(os.path.join(base_directory,"../plot.csv"),index_col='Nodes')
+        # df_len = len(df_csv)
+        # X = np.zeros(df_len)
+        # categorias =  np.empty(df_len, dtype=object)
+        # avgBandwidth = np.zeros(df_len)
+        # stdDevBandwidth = np.zeros(df_len)
+        # sizePerNode = np.zeros(df_len)
         
-        for i in range(len(df_csv)):
-            X[i]= i
-            categorias[i]= f"{df_csv.index[i]} Nodes"
-            avgBandwidth[i]= df_csv.iloc[i]['Avg_bandwidth']
-            stdDevBandwidth[i]= df_csv.iloc[i]['Stddev_bandwidth']
-            total_size_per_nodes= ( size_por_scenario * self.number_scenarios)/  self.number_scenarios_per_nodes *  (i+1 )**2
-            sizePerNode[i]= total_size_per_nodes
+        # for i in range(len(df_csv)):
+        #     X[i]= i
+        #     categorias[i]= f"{df_csv.index[i]} Nodes"
+        #     avgBandwidth[i]= df_csv.iloc[i]['Avg_bandwidth']
+        #     stdDevBandwidth[i]= df_csv.iloc[i]['Stddev_bandwidth']
+        #     #total_size_per_nodes= ( size_por_scenario * self.number_scenarios)/  self.number_scenarios_per_nodes *  (i+1 )**2
+        #     #sizePerNode[i]= total_size_per_nodes
         
-        fig, ax1 = plt.subplots()
-        # Plotando com barras de erro vindas da outra série
-        plt.figure(figsize=(8,5))      
-        ax1.bar(X, avgBandwidth, yerr=stdDevBandwidth, label="Banda Gb/s", capsize=8, color='lightgreen', edgecolor='black')         
-        ax1.set_ylabel('Banda Média')
-        #ax1.title(f'Banda média {plotLabel} com erro padrão')
+        # fig, ax1 = plt.subplots()
+        # # Plotando com barras de erro vindas da outra série
+        # plt.figure(figsize=(8,5))      
+        # ax1.bar(X, avgBandwidth, yerr=stdDevBandwidth, label="Banda Gb/s", capsize=8, color='lightgreen', edgecolor='black')         
+        # ax1.set_ylabel('Banda Média')
+        # #ax1.title(f'Banda média {plotLabel} com erro padrão')
 
         
-        ax2 = ax1.twinx()
-        ax2.bar(X, avgBandwidth, yerr=stdDevBandwidth, label="Volume de dados por nó em GB", capsize=8, color='blue', edgecolor='black')         
-        ax2.set_ylabel('Volume de dados por nó em GB')
+        # ax2 = ax1.twinx()
+        # ax2.bar(X, avgBandwidth, yerr=stdDevBandwidth, label="Volume de dados por nó em GB", capsize=8, color='blue', edgecolor='black')         
+        # ax2.set_ylabel('Volume de dados por nó em GB')
 
-        plt.xticks(X, categorias)        
-        plt.grid(True, axis='y', linestyle='--', alpha=0.5)
-        plt.tight_layout()     
-        plt.legend()  
-        plt.show()
+        # plt.xticks(X, categorias)        
+        # plt.grid(True, axis='y', linestyle='--', alpha=0.5)
+        # plt.tight_layout()     
+        # plt.legend()  
+        # plt.show()
 
     def plotScenarios(self,base_directory,plotLabel):
         
@@ -444,12 +460,12 @@ class MyPlot(object):
         plt.yscale("log")
         plt.xticks(xTicks, categorias)
         plt.ylabel('Tempo médio(s) do envio em escala logaritmica')
-        plt.title(f'Tempo médio do envio por tamanho da mensagem no ambiente {plotLabel} com erro padrão')
         plt.grid(True, axis='y', linestyle='--', alpha=0.5)
-        plt.tight_layout()     
-        plt.legend()  
-        plt.show()
 
+        plt.legend(loc='lower center', bbox_to_anchor=(0.5, 1.02), ncol=2)
+        plt.tight_layout()
+
+        plt.show()
 
 
     def plotExecutionTime(self,base_directory,plotLabel):
@@ -461,28 +477,35 @@ class MyPlot(object):
         categorias =  np.empty(df_len, dtype=object)
         AvgSimulation = np.zeros(df_len)
         Stdev_simulation = np.zeros(df_len)
-        Avg_time_per_process = np.zeros(df_len)
-        
+        Avg_io_process = np.zeros(df_len)
+        Stdev_time_per_process = np.zeros(df_len)        
         for i in range(len(df_csv)):
             X[i]= i
             categorias[i]= f"{df_csv.index[i]} Nodes"
             AvgSimulation_total= df_csv.iloc[i]['Avg_Simulation']            
             Stdev_simulation[i]= df_csv.iloc[i]['Stdev_simulation']
-            Avg_time_per_process[i]= df_csv.iloc[i]['Avg_comunication_time_per_process']
-            AvgSimulation[i]= AvgSimulation_total - Avg_time_per_process[i]
+            Avg_time_per_process= df_csv.iloc[i]['Avg_comunication_time_per_process']
+            Stdev_time_per_process[i]= df_csv.iloc[i]['std_per_process']
+            if 'Avg_mpiopen' in df_csv.columns:
+                AVg_mpiopen= df_csv.iloc[i]['Avg_mpiopen']
+                Avg_io_process[i]= Avg_time_per_process +  ( 2 * AVg_mpiopen ) # compute open and close time
+            else:                
+                Avg_io_process[i]= Avg_time_per_process
+            AvgSimulation[i]= AvgSimulation_total - Avg_io_process[i]
         
         # Plotando com barras de erro vindas da outra série
         plt.figure(figsize=(8,5))      
         plt.bar(X , AvgSimulation, yerr=Stdev_simulation, label="Computação", width=largura, color='lightgreen', edgecolor='black') 
-        plt.bar(X , Avg_time_per_process, bottom=AvgSimulation, label="E/S", width=largura, color='red', edgecolor='black') 
+        plt.bar(X , Avg_io_process, bottom=AvgSimulation, yerr=Stdev_time_per_process, label="E/S", width=largura, color='red', edgecolor='black') 
         #plt.bar(X , Avg_time_per_process, label="Comunicação", width=largura, color='blue', edgecolor='black') 
 
         plt.xticks(X, categorias)
-        plt.ylabel('tempo de simulação médio (s)')
-        plt.title(f'tempo de simulação médio (s) no {plotLabel} com desvio padrão.')
+        plt.ylabel('tempo de execução médio (s)')
         plt.grid(True, axis='y', linestyle='--', alpha=0.5)
-        plt.tight_layout()   
-        plt.legend()    
+
+        plt.legend(loc='lower center', bbox_to_anchor=(0.5, 1.02), ncol=2)
+        plt.tight_layout()
+
         plt.show()
     
     def PlotHistogram(self,max_size_kb=0):
