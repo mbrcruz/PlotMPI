@@ -240,7 +240,7 @@ class MyPlot(object):
         size_por_scenario = agrupados["sizeBytes"].mean() / 1000000000 # em GB
 
         # banda agregada em janelas de 60s (soma de todos os ranks)
-        window_sec = 60
+        window_sec = 300
         df_bw = df[['experiment', 'time_start', 'sizeBytes']].copy()
         exp_start = df_bw.groupby('experiment')['time_start'].transform('min')
         df_bw['window'] = ((df_bw['time_start'] - exp_start) // window_sec).astype(int)
