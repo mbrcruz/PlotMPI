@@ -108,7 +108,7 @@ class MyPlot(object):
                            continue
                         else:
                             if filter_scenario == 0 or scenario == filter_scenario:     
-                                        record= { "experiment": experiment+1, "scenario": scenario, "stage":stage, 'file': file, 'block': block, 'sizeBytes': size  , 'timeSec': diff , "rank": rank }   
+                                        record= { "experiment": experiment+1, "scenario": scenario, "stage":stage, 'file': file, 'block': block, 'sizeBytes': size  , 'timeSec': diff, 'time_start': time , "rank": rank }
                                         self.records.append(record)  
                                         #separating records by size categories   
                                         if size / (1024 * 1024) < self.categories[0]:
@@ -234,10 +234,19 @@ class MyPlot(object):
         
 
         agrupados = df.groupby("scenario")[["sizeBytes","timeSec"]].sum()
-        bandwidth_per_scenario = ( agrupados["sizeBytes"] * 8 / 1000000000 ) / agrupados["timeSec"]  # em Gb/s
-        avg_bandwidth = bandwidth_per_scenario.mean()
-        stddev_bandwidth = bandwidth_per_scenario.std()
         size_por_scenario = agrupados["sizeBytes"].mean() / 1000000000 # em GB
+
+        # banda agregada em janelas de 60s (soma de todos os ranks)
+        window_sec = 60
+        df_bw = df[['experiment', 'time_start', 'sizeBytes']].copy()
+        exp_start = df_bw.groupby('experiment')['time_start'].transform('min')
+        df_bw['window'] = ((df_bw['time_start'] - exp_start) // window_sec).astype(int)
+        bytes_per_window = df_bw.groupby(['experiment', 'window'])['sizeBytes'].sum()
+        bandwidth_per_window = bytes_per_window * 8 / 1e9 / window_sec  # Gb/s
+        avg_bw_per_experiment = bandwidth_per_window.groupby('experiment').mean()
+        avg_bandwidth = avg_bw_per_experiment.mean()
+        stddev_bandwidth = avg_bw_per_experiment.std()
+        print(f'Num windows ({window_sec}s): {bytes_per_window.groupby("experiment").count().mean():.0f}')
         # total_size_per_nodes = statistics.mean(self.sizesPerScenario.values()) * self.number_scenarios_per_nodes/ 1000000000
         total_size_per_nodes= ( size_por_scenario * self.number_scenarios)/  self.number_scenarios_per_nodes * self.number_nodes # em GB
         print(f'Total Size per Node (GB): {total_size_per_nodes:.2f}')        
@@ -245,9 +254,13 @@ class MyPlot(object):
         print(f'Stdev Bandwidth per scenario (Gb/s): {stddev_bandwidth:.2f}')
 
 
-        sum_mpiopen= self.df_mpiOpenTimes.groupby(["experiment","rank"])["timeSec"].sum()
-        avg_mpiopen = sum_mpiopen.groupby("experiment").mean().mean()
-        stdev_mpiopen = sum_mpiopen.groupby("experiment").mean().std()      
+        if self.df_mpiOpenTimes is None:
+            avg_mpiopen= 0
+            stdev_mpiopen=0
+        else:
+            sum_mpiopen= self.df_mpiOpenTimes.groupby(["experiment","rank"])["timeSec"].sum()
+            avg_mpiopen = sum_mpiopen.groupby("experiment").mean().mean()
+            stdev_mpiopen = sum_mpiopen.groupby("experiment").mean().std()      
               
         print(f'AVG MPIOpen (s): {avg_mpiopen:.2f}') 
         print(f'Stdev MPIOpen (s)): {stdev_mpiopen:.2f}')        
@@ -293,7 +306,7 @@ class MyPlot(object):
             writer.writerow(linha)
             arquivo_csv.close()      
             
-    def plotBandwidth(self,base_directory,plotLabel):
+    def plotBandwidth(self,base_directory,plotLabel,fatores):
         
 
 
@@ -307,9 +320,11 @@ class MyPlot(object):
         df_csv = pd.read_csv(os.path.join(base_directory, "../plot.csv"), index_col='Nodes')
         df_len = len(df_csv)
         X = np.arange(df_len)
-        categorias = [f"{n} Nodes" for n in df_csv.index]
-        avgBandwidth = df_csv['Avg_bandwidth'].to_numpy()
-        stdDevBandwidth = df_csv['Stddev_bandwidth'].to_numpy()
+        categorias = [f"{n} Nodes" for n in df_csv.index]        
+        avgBandwidthCenario = df_csv['Avg_bandwidth'].to_numpy()
+        avgBandwidth = avgBandwidthCenario * fatores           
+        stdDevBandwidthScenario = df_csv['Stddev_bandwidth'].to_numpy()
+        stdDevBandwidth = stdDevBandwidthScenario * fatores
 
         # calcula volume de dados por nó (GB) para segunda eixo y
         sizePerNode = np.zeros(df_len)
@@ -320,7 +335,7 @@ class MyPlot(object):
         # plot com dois eixos y
         fig, ax1 = plt.subplots(figsize=(8, 5))
         ax1.bar(X, avgBandwidth, yerr=stdDevBandwidth, capsize=8, color='lightgreen', edgecolor='black', label='Banda (Gb/s)')
-        ax1.set_ylabel('Banda média (Gb/s)', color='green')
+        ax1.set_ylabel('Banda agregada média (Gb/s)', color='green')
         ax1.set_xlabel('Configuração')
         ax1.set_xticks(X)
         ax1.set_xticklabels(categorias)
@@ -489,7 +504,7 @@ class MyPlot(object):
             if 'Avg_mpiopen' in df_csv.columns:
                 AVg_mpiopen= df_csv.iloc[i]['Avg_mpiopen']
                 Avg_io_process[i]= Avg_time_per_process +  ( 2 * AVg_mpiopen ) # compute open and close time
-                Stdev_time_per_process[i]= df_csv.iloc[i]['Stdev_mpiopen']
+                Stdev_time_per_process[i]= df_csv.iloc[i]['Stdev_mpiopen'] * 2 + df_csv.iloc[i]['std_per_process'] # compute stdev of open and close time
             else:                
                 Avg_io_process[i]= Avg_time_per_process
                 Stdev_time_per_process[i]= df_csv.iloc[i]['std_per_process']
@@ -497,9 +512,11 @@ class MyPlot(object):
         
         # Plotando com barras de erro vindas da outra série
         plt.figure(figsize=(8,5))      
-        plt.bar(X , AvgSimulation, yerr=Stdev_simulation, label="Computação", width=largura, color='lightgreen', edgecolor='black') 
-        plt.bar(X , Avg_io_process, bottom=AvgSimulation, yerr=Stdev_time_per_process, label="E/S", width=largura, color='red', edgecolor='black') 
-        #plt.bar(X , Avg_time_per_process, label="Comunicação", width=largura, color='blue', edgecolor='black') 
+        #error_kw = dict(elinewidth=1.5, capthick=1.5)
+        error_kw = dict(elinewidth=2.5, capthick=2.5, ecolor='black')
+        plt.bar(X , AvgSimulation, yerr=Stdev_simulation, label="Computação", width=largura, capsize=8, error_kw=error_kw, color='lightgreen', edgecolor='black')
+        plt.bar(X , Avg_io_process, bottom=AvgSimulation, yerr=Stdev_time_per_process, label="E/S", width=largura, capsize=8, error_kw=error_kw, color='red', edgecolor='black')
+
 
         plt.xticks(X, categorias)
         plt.ylabel('tempo de execução médio (s)')
