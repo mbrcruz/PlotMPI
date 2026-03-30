@@ -485,12 +485,14 @@ class MyPlot(object):
             AvgSimulation_total= df_csv.iloc[i]['Avg_Simulation']            
             Stdev_simulation[i]= df_csv.iloc[i]['Stdev_simulation']
             Avg_time_per_process= df_csv.iloc[i]['Avg_comunication_time_per_process']
-            Stdev_time_per_process[i]= df_csv.iloc[i]['std_per_process']
+          
             if 'Avg_mpiopen' in df_csv.columns:
                 AVg_mpiopen= df_csv.iloc[i]['Avg_mpiopen']
                 Avg_io_process[i]= Avg_time_per_process +  ( 2 * AVg_mpiopen ) # compute open and close time
+                Stdev_time_per_process[i]= df_csv.iloc[i]['Stdev_mpiopen']
             else:                
                 Avg_io_process[i]= Avg_time_per_process
+                Stdev_time_per_process[i]= df_csv.iloc[i]['std_per_process']
             AvgSimulation[i]= AvgSimulation_total - Avg_io_process[i]
         
         # Plotando com barras de erro vindas da outra série
