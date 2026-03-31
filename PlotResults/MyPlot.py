@@ -235,15 +235,15 @@ class MyPlot(object):
         print(f'StdDev Simulation per Process(s): {stdev_simulation}') 
 
         
-        agrupados = df.groupby(["experiment","rank"])[["sizeBytes","timeSec"]].sum()
-        print(agrupados)
+        agrupados = df.groupby(["experiment","rank"])[["sizeBytes","timeSec"]].sum()      
         bandwidth_per_rank = ( agrupados["sizeBytes"] * 8 / 1000000000 ) / agrupados["timeSec"]  # em Gb/s
         print(bandwidth_per_rank)
-        avg_agregate_bandwidth = bandwidth_per_rank.mean() * self.number_scenarios_per_nodes * self.number_nodes
-        stddev_bandwidth = bandwidth_per_rank.std() * self.number_scenarios_per_nodes * self.number_nodes
+        avg_agregate_bandwidth = bandwidth_per_rank.mean() * self.number_scenarios_per_nodes * self.number_nodes # em Gb/s
+        stddev_bandwidth = bandwidth_per_rank.std() * self.number_scenarios_per_nodes * self.number_nodes # em Gb/s
         size_por_rank = agrupados["sizeBytes"].mean() / 1000000000 # em GB
+        print(size_por_rank)
         # total_size_per_nodes = statistics.mean(self.sizesPerScenario.values()) * self.number_scenarios_per_nodes/ 1000000000
-        total_size_per_nodes= ( size_por_rank * self.number_scenarios)/  self.number_scenarios_per_nodes * self.number_nodes # em GB
+        total_size_per_nodes= size_por_rank  *  self.number_scenarios_per_nodes # em GB
         print(f'Total Size per Node (GB): {total_size_per_nodes:.2f}')        
         print(f'AVG Aggregate Bandwidth per scenario (Gb/s): {avg_agregate_bandwidth:.2f}') 
         print(f'Stdev Aggregate Bandwidth per scenario (Gb/s): {stddev_bandwidth:.2f}')
@@ -316,10 +316,10 @@ class MyPlot(object):
         df_len = len(df_csv)
         X = np.arange(df_len)
         categorias = [f"{n} Nodes" for n in df_csv.index]        
-        avgBandwidthCenario = df_csv['Avg_bandwidth'].to_numpy()
-        avgBandwidth = avgBandwidthCenario * fatores           
+        avgBandwidth = df_csv['Avg_bandwidth'].to_numpy()
+        #avgBandwidth = avgBandwidthCenario
         stdDevBandwidthScenario = df_csv['Stddev_bandwidth'].to_numpy()
-        stdDevBandwidth = stdDevBandwidthScenario * fatores
+        stdDevBandwidth = stdDevBandwidthScenario
 
         # calcula volume de dados por nó (GB) para segunda eixo y
         sizePerNode = np.zeros(df_len)
