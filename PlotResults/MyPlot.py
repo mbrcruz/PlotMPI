@@ -236,12 +236,12 @@ class MyPlot(object):
 
         
         agrupados = df.groupby(["experiment","rank"])[["sizeBytes","timeSec"]].sum()      
-        bandwidth_per_rank = ( agrupados["sizeBytes"] * 8 / 1000000000 ) / agrupados["timeSec"]  # em Gb/s
-        print(bandwidth_per_rank)
-        avg_agregate_bandwidth = bandwidth_per_rank.mean() * self.number_scenarios_per_nodes * self.number_nodes # em Gb/s
-        stddev_bandwidth = bandwidth_per_rank.std() * self.number_scenarios_per_nodes * self.number_nodes # em Gb/s
-        size_por_rank = agrupados["sizeBytes"].mean() / 1000000000 # em GB
-        print(size_por_rank)
+        bandwidth_per_rank = ( agrupados["sizeBytes"] * 8 / 1000000000 ) / agrupados["timeSec"]  # em Gb/s        
+        bandwidth_per_experiment = bandwidth_per_rank.groupby("experiment").sum()
+        print(bandwidth_per_experiment)
+        avg_agregate_bandwidth = bandwidth_per_experiment.mean()
+        stddev_bandwidth =  bandwidth_per_experiment.std()
+        size_por_rank = agrupados["sizeBytes"].mean() / 1000000000 # em GB        
         # total_size_per_nodes = statistics.mean(self.sizesPerScenario.values()) * self.number_scenarios_per_nodes/ 1000000000
         total_size_per_nodes= size_por_rank  *  self.number_scenarios_per_nodes # em GB
         print(f'Total Size per Node (GB): {total_size_per_nodes:.2f}')        
