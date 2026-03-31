@@ -235,18 +235,33 @@ class MyPlot(object):
         print(f'StdDev Simulation per Process(s): {stdev_simulation}') 
 
         
-        agrupados = df.groupby(["experiment","rank"])[["sizeBytes","timeSec"]].sum()      
-        bandwidth_per_rank = ( agrupados["sizeBytes"] * 8 / 1000000000 ) / agrupados["timeSec"]  # em Gb/s        
-        bandwidth_per_experiment = bandwidth_per_rank.groupby("experiment").sum()
-        print(bandwidth_per_experiment)
-        avg_agregate_bandwidth = bandwidth_per_experiment.mean()
-        stddev_bandwidth =  bandwidth_per_experiment.std()
-        size_por_rank = agrupados["sizeBytes"].mean() / 1000000000 # em GB        
-        # total_size_per_nodes = statistics.mean(self.sizesPerScenario.values()) * self.number_scenarios_per_nodes/ 1000000000
-        total_size_per_nodes= size_por_rank  *  self.number_scenarios_per_nodes # em GB
-        print(f'Total Size per Node (GB): {total_size_per_nodes:.2f}')        
-        print(f'AVG Aggregate Bandwidth per scenario (Gb/s): {avg_agregate_bandwidth:.2f}') 
-        print(f'Stdev Aggregate Bandwidth per scenario (Gb/s): {stddev_bandwidth:.2f}')
+        # Banda agregada com janelas de tempo fixas para capturar concorrência real entre ranks
+        WINDOW_SEC = 300
+        results_bw = []
+        for exp, df_exp in df.groupby("experiment"):
+            t0 = df_exp["time_start"].min()
+            windows = ((df_exp["time_start"] - t0) // WINDOW_SEC).astype(int)                               
+            df_exp_w = df_exp.assign(window=windows)
+            bytes_per_window    = df_exp_w.groupby("window")["sizeBytes"].sum()
+            avg_time_per_window = df_exp_w.groupby(["window","rank"])["timeSec"].sum().groupby("window").mean()
+            bw_per_window = bytes_per_window * 8 / 1e9 / avg_time_per_window  # Gb/s
+            results_bw.append({
+                "experiment": exp,
+                "mean_bw": bw_per_window.mean(),
+                "std_bw": bw_per_window.std(ddof=1) if len(bw_per_window) > 1 else 0.0
+            })
+        df_bw = pd.DataFrame(results_bw).set_index("experiment")
+        print(f"Banda agregada por experimento (janelas de {WINDOW_SEC}s):")
+        for exp, row in df_bw.iterrows():
+            print(f'  Experimento {exp}: {row["mean_bw"]:.2f} ± {row["std_bw"]:.2f} Gb/s')
+        avg_agregate_bandwidth = df_bw["mean_bw"].mean()
+        stddev_bandwidth       = df_bw["mean_bw"].std(ddof=1) if len(df_bw) > 1 else 0.0
+        agrupados = df.groupby(["experiment","rank"])[["sizeBytes","timeSec"]].sum()
+        size_por_rank = agrupados["sizeBytes"].mean() / 1e9  # em GB
+        total_size_per_nodes = size_por_rank * self.number_scenarios_per_nodes  # em GB
+        print(f'Total Size per Node (GB): {total_size_per_nodes:.2f}')
+        print(f'AVG Aggregate Bandwidth (Gb/s): {avg_agregate_bandwidth:.2f}')
+        print(f'Stdev Aggregate Bandwidth (Gb/s): {stddev_bandwidth:.2f}')
 
 
         if self.df_mpiOpenTimes is None:
@@ -301,7 +316,7 @@ class MyPlot(object):
             writer.writerow(linha)
             arquivo_csv.close()      
             
-    def plotBandwidth(self,base_directory,plotLabel,fatores):
+    def plotBandwidth(self,base_directory,plotLabel):
         
 
 
@@ -337,57 +352,9 @@ class MyPlot(object):
         ax1.grid(True, axis='y', linestyle='--', alpha=0.5)
         ax1.set_ylim(bottom=0)
 
-        # ax2 = ax1.twinx()
-        # ax2.plot(X, sizePerNode, color='blue', marker='o', linewidth=2, label='Volume de dados por nó (GB)')        
-        # ax2.set_ylim(bottom=0)
-        # ax2.set_ylabel('Volume de dados por nó (GB)', color='blue')
-
-        # # combinando legendas
-        # h1, l1 = ax1.get_legend_handles_labels()
-        # h2, l2 = ax2.get_legend_handles_labels()
-        # ax1.legend(h1 + h2, l1 + l2, loc='upper left')
-
-        #plt.title(f'Banda média por nó - {plotLabel}')
         plt.tight_layout()
         plt.show()
-        return
-        # agrupados = df.groupby("scenario")[["sizeBytes"]].sum()        
-        # size_por_scenario = agrupados["sizeBytes"].mean() / 1000000000 # em GB        
-        
-        
-        # df_csv = pd.read_csv(os.path.join(base_directory,"../plot.csv"),index_col='Nodes')
-        # df_len = len(df_csv)
-        # X = np.zeros(df_len)
-        # categorias =  np.empty(df_len, dtype=object)
-        # avgBandwidth = np.zeros(df_len)
-        # stdDevBandwidth = np.zeros(df_len)
-        # sizePerNode = np.zeros(df_len)
-        
-        # for i in range(len(df_csv)):
-        #     X[i]= i
-        #     categorias[i]= f"{df_csv.index[i]} Nodes"
-        #     avgBandwidth[i]= df_csv.iloc[i]['Avg_bandwidth']
-        #     stdDevBandwidth[i]= df_csv.iloc[i]['Stddev_bandwidth']
-        #     #total_size_per_nodes= ( size_por_scenario * self.number_scenarios)/  self.number_scenarios_per_nodes *  (i+1 )**2
-        #     #sizePerNode[i]= total_size_per_nodes
-        
-        # fig, ax1 = plt.subplots()
-        # # Plotando com barras de erro vindas da outra série
-        # plt.figure(figsize=(8,5))      
-        # ax1.bar(X, avgBandwidth, yerr=stdDevBandwidth, label="Banda Gb/s", capsize=8, color='lightgreen', edgecolor='black')         
-        # ax1.set_ylabel('Banda Média')
-        # #ax1.title(f'Banda média {plotLabel} com erro padrão')
-
-        
-        # ax2 = ax1.twinx()
-        # ax2.bar(X, avgBandwidth, yerr=stdDevBandwidth, label="Volume de dados por nó em GB", capsize=8, color='blue', edgecolor='black')         
-        # ax2.set_ylabel('Volume de dados por nó em GB')
-
-        # plt.xticks(X, categorias)        
-        # plt.grid(True, axis='y', linestyle='--', alpha=0.5)
-        # plt.tight_layout()     
-        # plt.legend()  
-        # plt.show()
+        return        
 
     def plotScenarios(self,base_directory,plotLabel):
         
