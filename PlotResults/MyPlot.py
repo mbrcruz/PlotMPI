@@ -235,20 +235,18 @@ class MyPlot(object):
         print(f'StdDev Simulation per Process(s): {stdev_simulation}') 
 
         
-
-        agrupados = df.groupby("scenario")[["sizeBytes","timeSec"]].sum()
-        size_por_scenario = agrupados["sizeBytes"].mean() / 1000000000 # em GB
-
-        agrupados = df.groupby("scenario")[["sizeBytes","timeSec"]].sum()
-        bandwidth_per_scenario = ( agrupados["sizeBytes"] * 8 / 1000000000 ) / agrupados["timeSec"]  # em Gb/s
-        avg_bandwidth = bandwidth_per_scenario.mean()
-        stddev_bandwidth = bandwidth_per_scenario.std()
-        size_por_scenario = agrupados["sizeBytes"].mean() / 1000000000 # em GB
+        agrupados = df.groupby(["experiment","rank"])[["sizeBytes","timeSec"]].sum()
+        print(agrupados)
+        bandwidth_per_rank = ( agrupados["sizeBytes"] * 8 / 1000000000 ) / agrupados["timeSec"]  # em Gb/s
+        print(bandwidth_per_rank)
+        avg_agregate_bandwidth = bandwidth_per_rank.mean() * self.number_scenarios_per_nodes * self.number_nodes
+        stddev_bandwidth = bandwidth_per_rank.std() * self.number_scenarios_per_nodes * self.number_nodes
+        size_por_rank = agrupados["sizeBytes"].mean() / 1000000000 # em GB
         # total_size_per_nodes = statistics.mean(self.sizesPerScenario.values()) * self.number_scenarios_per_nodes/ 1000000000
-        total_size_per_nodes= ( size_por_scenario * self.number_scenarios)/  self.number_scenarios_per_nodes * self.number_nodes # em GB
+        total_size_per_nodes= ( size_por_rank * self.number_scenarios)/  self.number_scenarios_per_nodes * self.number_nodes # em GB
         print(f'Total Size per Node (GB): {total_size_per_nodes:.2f}')        
-        print(f'AVG Bandwidth per scenario (Gb/s): {avg_bandwidth:.2f}') 
-        print(f'Stdev Bandwidth per scenario (Gb/s): {stddev_bandwidth:.2f}')
+        print(f'AVG Aggregate Bandwidth per scenario (Gb/s): {avg_agregate_bandwidth:.2f}') 
+        print(f'Stdev Aggregate Bandwidth per scenario (Gb/s): {stddev_bandwidth:.2f}')
 
 
         if self.df_mpiOpenTimes is None:
@@ -269,7 +267,7 @@ class MyPlot(object):
                             'Avg_Simulation': avg_simulation , 'Stdev_simulation': stdev_simulation,
                             'Avg_comunication_time_per_process': avg_per_process, 'std_per_process': std_per_process,
                             'Avg_time_per_scenario': avg_time_per_scenario ,'Stdev_time_per_scenario': stdev_time_per_scenario,
-                            'Avg_bandwidth': avg_bandwidth, 'Stddev_bandwidth': stddev_bandwidth,
+                            'Avg_bandwidth': avg_agregate_bandwidth, 'Stddev_bandwidth': stddev_bandwidth,
                             'worstScenario': self.worstScenario, 'max_time_per_scenario': max_time_per_scenario,
                             'bestScenario': self.bestScenario, 'min_time_per_scenario': min_time_per_scenario ,
                             'Avg_time_per_record1': Avg_time_per_record1 ,'Stdev_time_per_record1': Stdev_time_per_record1,
