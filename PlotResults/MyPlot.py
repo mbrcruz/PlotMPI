@@ -243,8 +243,8 @@ class MyPlot(object):
             windows = ((df_exp["time_start"] - t0) // WINDOW_SEC).astype(int)                               
             df_exp_w = df_exp.assign(window=windows)
             bytes_per_window    = df_exp_w.groupby("window")["sizeBytes"].sum()
-            avg_time_per_window = df_exp_w.groupby(["window","rank"])["timeSec"].sum().groupby("window").mean()
-            bw_per_window = bytes_per_window * 8 / 1e9 / avg_time_per_window  # Gb/s
+            max_time_per_window = df_exp_w.groupby(["window","rank"])["timeSec"].sum().groupby("window").max()
+            bw_per_window = bytes_per_window * 8 / 1e9 / max_time_per_window  # Gb/s
             results_bw.append({
                 "experiment": exp,
                 "mean_bw": bw_per_window.mean(),
