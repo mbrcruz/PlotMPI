@@ -457,33 +457,33 @@ class MyPlot(object):
         AvgSimulation = np.zeros(df_len)
         Stdev_simulation = np.zeros(df_len)
         Avg_io_process = np.zeros(df_len)
-        Stdev_time_per_process = np.zeros(df_len)   
-
+        Stdev_time_per_process = np.zeros(df_len) 
         Avg_mpiComunication = np.zeros(df_len)
         Std_mpiComunication = np.zeros(df_len)
              
         for i in range(len(df_csv)):
             X[i]= i
             categorias[i]= f"{df_csv.index[i]} Nodes"            
-            Stdev_simulation[i]= df_csv.iloc[i]['Stdev_simulation']
-            Avg_time_per_process= df_csv.iloc[i]['Avg_comunication_time_per_process']
-            Avg_io_process[i]= df_csv.iloc[i]['Avg_Simulation']            
+            AvgSimulation[i]= df_csv.iloc[i]['Avg_Simulation']     
+            Stdev_simulation[i]= df_csv.iloc[i]['Stdev_simulation']            
+                   
+            Avg_io_process[i] = df_csv.iloc[i]['Avg_comunication_time_per_process']
             Stdev_time_per_process[i]= df_csv.iloc[i]['std_per_process']
+
             if 'Avg_mpiComunication' in df_csv.columns:                
                 Avg_mpiComunication[i]= 2 * df_csv.iloc[i]['Avg_mpiComunication']
-                Std_mpiComunication[i]= 2 * df_csv.iloc[i]['Stdev_mpiComunication']
-                Stdev_time_per_process[i]= df_csv.iloc[i]['Stdev_mpiComunication'] * 2 + df_csv.iloc[i]['std_per_process'] # compute stdev of open and close time
+                Std_mpiComunication[i]= 2 * df_csv.iloc[i]['Stdev_mpiComunication']                
             else:
                 Avg_mpiComunication[i] = 0
-            AvgSimulation[i]= Avg_io_process[i] - Avg_io_process[i] - Avg_mpiComunication[i]
+            AvgSimulation[i]= AvgSimulation[i]- Avg_io_process[i] - Avg_mpiComunication[i]
         
         # Plotando com barras de erro vindas da outra série
         plt.figure(figsize=(8,5))      
         #error_kw = dict(elinewidth=1.5, capthick=1.5)
         error_kw = dict(elinewidth=2.5, capthick=2.5, ecolor='black')
         plt.bar(X , AvgSimulation, yerr=Stdev_simulation, label="Computação", width=largura, capsize=8, error_kw=error_kw, color='lightgreen', edgecolor='black')
-        plt.bar(X , Avg_mpiComunication, bottom=AvgSimulation, yerr=Stdev_time_per_process, label="Comunicação", width=largura, capsize=8, error_kw=error_kw, color='red', edgecolor='black')
-        plt.bar(X , Avg_io_process, bottom=Avg_mpiComunication, yerr=Std_mpiComunication, label="E/S", width=largura, capsize=8, error_kw=error_kw, color='red', edgecolor='black')
+        plt.bar(X , Avg_mpiComunication, bottom=AvgSimulation, yerr=Stdev_time_per_process, label="Comunicação", width=largura, capsize=8, error_kw=error_kw, color='blue', edgecolor='black')
+        plt.bar(X , Avg_io_process, bottom=AvgSimulation+Avg_mpiComunication, yerr=Std_mpiComunication, label="E/S", width=largura, capsize=8, error_kw=error_kw, color='red', edgecolor='black')
 
 
         plt.xticks(X, categorias)
