@@ -460,21 +460,27 @@ class MyPlot(object):
         Stdev_time_per_process = np.zeros(df_len) 
         Avg_mpiComunication = np.zeros(df_len)
         Std_mpiComunication = np.zeros(df_len)
-             
+
+
+        timePerScenarioBase = 0      
+        comunicationEstimate = 0         
         for i in range(len(df_csv)):
             X[i]= i
             categorias[i]= f"{df_csv.index[i]} Nodes"            
-            AvgSimulation[i]= df_csv.iloc[i]['Avg_Simulation']     
-            Stdev_simulation[i]= df_csv.iloc[i]['Stdev_simulation']            
-                   
+            AvgSimulation[i]= df_csv.iloc[i]['Avg_Simulation']                 
+            Stdev_simulation[i]= df_csv.iloc[i]['Stdev_simulation']
             Avg_io_process[i] = df_csv.iloc[i]['Avg_comunication_time_per_process']
             Stdev_time_per_process[i]= df_csv.iloc[i]['std_per_process']
-
+            # if i== 0:
+            #         timePerScenarioBase = df_csv.iloc[i]['Avg_Simulation']
+            # else:                
+            #     comunicationEstimate = df_csv.iloc[i]['Avg_Simulation'] - timePerScenarioBase/( 2**i) - Avg_io_process[i]
+            #     print(f"Comunication Estimate for {categorias[i]} Nodes: {comunicationEstimate:.2f} s")
             if 'Avg_mpiComunication' in df_csv.columns:                
-                Avg_mpiComunication[i]= 2 * df_csv.iloc[i]['Avg_mpiComunication']
-                Std_mpiComunication[i]= 2 * df_csv.iloc[i]['Stdev_mpiComunication']                
+                Avg_mpiComunication[i]= 2 * df_csv.iloc[i]['Avg_mpiComunication'] + comunicationEstimate
+                Std_mpiComunication[i]= 2 * df_csv.iloc[i]['Stdev_mpiComunication']               
             else:
-                Avg_mpiComunication[i] = 0
+                Avg_mpiComunication[i] = comunicationEstimate
             AvgSimulation[i]= AvgSimulation[i]- Avg_io_process[i] - Avg_mpiComunication[i]
         
         # Plotando com barras de erro vindas da outra série
@@ -482,8 +488,8 @@ class MyPlot(object):
         #error_kw = dict(elinewidth=1.5, capthick=1.5)
         error_kw = dict(elinewidth=2.5, capthick=2.5, ecolor='black')
         plt.bar(X , AvgSimulation, yerr=Stdev_simulation, label="Computação", width=largura, capsize=8, error_kw=error_kw, color='lightgreen', edgecolor='black')
-        plt.bar(X , Avg_mpiComunication, bottom=AvgSimulation, yerr=Stdev_time_per_process, label="Comunicação", width=largura, capsize=8, error_kw=error_kw, color='blue', edgecolor='black')
-        plt.bar(X , Avg_io_process, bottom=AvgSimulation+Avg_mpiComunication, yerr=Std_mpiComunication, label="E/S", width=largura, capsize=8, error_kw=error_kw, color='red', edgecolor='black')
+        plt.bar(X , Avg_mpiComunication, bottom=AvgSimulation, yerr=Std_mpiComunication, label="Comunicação", width=largura, capsize=8, error_kw=error_kw, color='blue', edgecolor='black')
+        plt.bar(X , Avg_io_process, bottom=AvgSimulation+Avg_mpiComunication, yerr=Stdev_time_per_process, label="E/S", width=largura, capsize=8, error_kw=error_kw, color='red', edgecolor='black')
 
 
         plt.xticks(X, categorias)
