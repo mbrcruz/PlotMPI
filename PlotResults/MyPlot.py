@@ -140,7 +140,7 @@ class MyPlot(object):
         print( f" Number Scenario {self.number_scenarios}")
         print( f" Base Directory {self.base_directory}")
    
-    def computerMetrics(self):     
+    def computerMetrics(self,desabilitaEscreverCsv=False):     
         
         
             # as 2 contagens nao sao relevantes, porque os buffers tem tamanhos diferentes.
@@ -278,21 +278,21 @@ class MyPlot(object):
         print(f'Stdev MPIOpen (s)): {stdev_mpiopen:.2f}')        
         
         
-        
-        print("Writing CSV file...")
-        self.escreveCsv({ 'Nodes': self.number_nodes, 
-                            'Avg_Simulation': avg_simulation , 'Stdev_simulation': stdev_simulation,
-                            'Avg_comunication_time_per_process': avg_per_process, 'std_per_process': std_per_process,
-                            'Avg_time_per_scenario': avg_time_per_scenario ,'Stdev_time_per_scenario': stdev_time_per_scenario,
-                            'Avg_bandwidth': avg_agregate_bandwidth, 'Stddev_bandwidth': stddev_bandwidth,
-                            'worstScenario': self.worstScenario, 'max_time_per_scenario': max_time_per_scenario,
-                            'bestScenario': self.bestScenario, 'min_time_per_scenario': min_time_per_scenario ,
-                            'Avg_time_per_record1': Avg_time_per_record1 ,'Stdev_time_per_record1': Stdev_time_per_record1,
-                            'Avg_time_per_record2': Avg_time_per_record2 ,'Stdev_time_per_record2': Stdev_time_per_record2,
-                            'Avg_time_per_record3': Avg_time_per_record3 ,'Stdev_time_per_record3': Stdev_time_per_record3,
-                            'Avg_time_per_record4': Avg_time_per_record4 ,'Stdev_time_per_record4': Stdev_time_per_record4,
-                            "Avg_mpiComunication": avg_mpiopen, 'Stdev_mpiComunication': stdev_mpiopen
-                            } )  
+        if not desabilitaEscreverCsv:
+            print("Writing CSV file...")
+            self.escreveCsv({ 'Nodes': self.number_nodes, 
+                                'Avg_Simulation': avg_simulation , 'Stdev_simulation': stdev_simulation,
+                                'Avg_comunication_time_per_process': avg_per_process, 'std_per_process': std_per_process,
+                                'Avg_time_per_scenario': avg_time_per_scenario ,'Stdev_time_per_scenario': stdev_time_per_scenario,
+                                'Avg_bandwidth': avg_agregate_bandwidth, 'Stddev_bandwidth': stddev_bandwidth,
+                                'worstScenario': self.worstScenario, 'max_time_per_scenario': max_time_per_scenario,
+                                'bestScenario': self.bestScenario, 'min_time_per_scenario': min_time_per_scenario ,
+                                'Avg_time_per_record1': Avg_time_per_record1 ,'Stdev_time_per_record1': Stdev_time_per_record1,
+                                'Avg_time_per_record2': Avg_time_per_record2 ,'Stdev_time_per_record2': Stdev_time_per_record2,
+                                'Avg_time_per_record3': Avg_time_per_record3 ,'Stdev_time_per_record3': Stdev_time_per_record3,
+                                'Avg_time_per_record4': Avg_time_per_record4 ,'Stdev_time_per_record4': Stdev_time_per_record4,
+                                "Avg_mpiComunication": avg_mpiopen, 'Stdev_mpiComunication': stdev_mpiopen
+                                } )  
         
 
     def escreveCsv(self,linha):
@@ -476,12 +476,13 @@ class MyPlot(object):
             # else:                
             #     comunicationEstimate = df_csv.iloc[i]['Avg_Simulation'] - timePerScenarioBase/( 2**i) - Avg_io_process[i]
             #     print(f"Comunication Estimate for {categorias[i]} Nodes: {comunicationEstimate:.2f} s")
-            if 'Avg_mpiComunication' in df_csv.columns:                
-                Avg_mpiComunication[i]= 2 * df_csv.iloc[i]['Avg_mpiComunication'] + comunicationEstimate
-                Std_mpiComunication[i]= 2 * df_csv.iloc[i]['Stdev_mpiComunication']               
+            if df_csv.iloc[i]['Avg_mpiComunication'] > 0:
+                Avg_mpiComunication[i]= 2 * df_csv.iloc[i]['Avg_mpiComunication'] + Avg_io_process[i]
+                Std_mpiComunication[i]= 2 * df_csv.iloc[i]['Stdev_mpiComunication']   
             else:
-                Avg_mpiComunication[i] = comunicationEstimate
-            AvgSimulation[i]= AvgSimulation[i]- Avg_io_process[i] - Avg_mpiComunication[i]
+                Avg_mpiComunication[i]= Avg_io_process[i]
+                Std_mpiComunication[i]= Stdev_time_per_process[i]                       
+            AvgSimulation[i]= AvgSimulation[i] - Avg_mpiComunication[i]
         
         # Plotando com barras de erro vindas da outra série
         plt.figure(figsize=(8,5))      
@@ -489,7 +490,6 @@ class MyPlot(object):
         error_kw = dict(elinewidth=2.5, capthick=2.5, ecolor='black')
         plt.bar(X , AvgSimulation, yerr=Stdev_simulation, label="Computação", width=largura, capsize=8, error_kw=error_kw, color='lightgreen', edgecolor='black')
         plt.bar(X , Avg_mpiComunication, bottom=AvgSimulation, yerr=Std_mpiComunication, label="Comunicação", width=largura, capsize=8, error_kw=error_kw, color='blue', edgecolor='black')
-        plt.bar(X , Avg_io_process, bottom=AvgSimulation+Avg_mpiComunication, yerr=Stdev_time_per_process, label="E/S", width=largura, capsize=8, error_kw=error_kw, color='red', edgecolor='black')
 
 
         plt.xticks(X, categorias)
