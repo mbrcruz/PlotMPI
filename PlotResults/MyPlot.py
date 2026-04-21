@@ -161,21 +161,20 @@ class MyPlot(object):
         df2= pd.DataFrame(self.records2)
         df3= pd.DataFrame(self.records3)
         df4= pd.DataFrame(self.records4)
+        df_simulation = pd.DataFrame(self.Simulations)
         if self.mpiOpenComunication is not None and len(self.mpiOpenComunication) > 0:
             self.df_mpiOpenComunication= pd.DataFrame(self.mpiOpenComunication)
         else:
             self.df_mpiOpenComunication= None
-        df_simulation = pd.DataFrame(self.Simulations)
+        
 
         sum_scenarios= df.groupby(["experiment","scenario"])["timeSec"].sum()
 
         #record_por_cenarios= df[~df["scenario"].isin(self.badScenarios)].groupby("scenario")["timeSec"].size().reset_index(name="num_registros").sort_values("num_registros", ascending=False)            
         # record_por_cenarios= ~df.isin(self.badScenarios).size()
         #print(record_por_cenarios)                
-        avg_time_per_scenario=  sum_scenarios.groupby("experiment").mean().mean()
-        print(avg_time_per_scenario)
-        stdev_time_per_scenario = sum_scenarios.groupby("experiment").mean().std()
-        print(stdev_time_per_scenario)
+        avg_time_per_scenario=  sum_scenarios.groupby("experiment").mean().mean()       
+        stdev_time_per_scenario = sum_scenarios.groupby("experiment").mean().std()        
 
         self.worstScenario= sum_scenarios.idxmax()
         self.bestScenario= sum_scenarios.idxmin()
@@ -184,11 +183,16 @@ class MyPlot(object):
         
     
         #avg_simulation = statistics.mean(self.Simulations)
-        avg_simulation = df_simulation.groupby(["experiment"])["hour_simulation"].mean()        
+        avg_simulation = df_simulation.groupby("experiment")["hourly_simulation"].mean()    
+        print(avg_simulation)    
         stdev_simulation  = avg_simulation.std()
+        print(stdev_simulation)
 
-        Avg_comunication_per_process = df_simulation.groupby(["experiment"])["comunication"].mean()        
+        Avg_comunication_per_process = df_simulation.groupby("experiment")["comunication"].mean()     
         stdev_comunication_per_process = Avg_comunication_per_process.std()
+
+        print(f'Avg Comunication per Process(s): {Avg_comunication_per_process}')
+        print(f'StdDev Comunication per Process(s): {stdev_comunication_per_process}')
 
         #Falta desvio padrao de comunicacao por processo
         print(f'Avg Simulation per Process(s): {avg_simulation}') 
@@ -246,8 +250,8 @@ class MyPlot(object):
         Avg_io_per_process = df.groupby(["experiment","rank"])["timeSec"].sum().mean()        
         std_io_per_process = df.groupby(["experiment","rank"])["timeSec"].sum().std()        
         # # Average time per process)
-        print(f'Avg Comunication per Process(s): {Avg_io_per_process}') 
-        print(f'Std Comunication per Process(s): {std_io_per_process}') 
+        print(f'Avg IO per Process(s): {Avg_io_per_process}') 
+        print(f'Std IO per Process(s): {std_io_per_process}') 
         
         
      
