@@ -39,8 +39,8 @@ class MyPlot(object):
         self.X4=[]
         self.records=[]
         self.Simulations=[]
-        self.df_mpiComunication=[]
-        self.mpiComunication=[]
+        self.df_mpiOpenComunication=[]
+        self.mpiOpenComunication=[]
         self.localScenarios=[]   
         self.bestScenario=0
         self.worstScenario=0 
@@ -121,18 +121,25 @@ class MyPlot(object):
                                             self.records4.append(record)  
 
                     self.df_times= pd.read_csv(os.path.join(self.base_directory , str(experiment+1), f"sddptimer{rank:04d}.log"),header=None)
+                    
+                    simulation = { "experiment":  experiment+1, "rank": rank, "simulation": 0, "hourly_simulation": 0 }
                     for k in range(len(self.df_times)):
+                      
                         if  self.df_times.iloc[k,0] == "Simulation":
-                            self.Simulations.append(float(self.df_times.iloc[k,1]))   
+                            simulation["simulation"]= float(self.df_times.iloc[k,1])
+                        if  self.df_times.iloc[k,0] == "Hourly simulation":
+                            simulation["hourly_simulation"]= float(self.df_times.iloc[k,1])
+                    simulation["comunication"] = simulation["simulation"] - simulation["hourly_simulation"]
+                    self.Simulations.append(simulation)
 
                     # load mpi comunication times if exist
                     if os.path.exists(os.path.join(self.base_directory , str(experiment+1), f"mpiio-open-{rank}.log")):
-                        self.df_mpiComunication= pd.read_csv(os.path.join(self.base_directory , str(experiment+1), f"mpiio-open-{rank}.log"),header=None)
-                        for k in range(len(self.df_mpiComunication)):
-                            mpiopenDiff= self.df_mpiComunication.iloc[k,3] - self.df_mpiComunication.iloc[k,2]
+                        self.df_mpiOpenComunication= pd.read_csv(os.path.join(self.base_directory , str(experiment+1), f"mpiio-open-{rank}.log"),header=None)
+                        for k in range(len(self.df_mpiOpenComunication)):
+                            mpiopenDiff= self.df_mpiOpenComunication.iloc[k,3] - self.df_mpiOpenComunication.iloc[k,2]
                             mpiOpenTimeRecord={}
                             mpiOpenTimeRecord= { "experiment": experiment+1, 'timeSec': mpiopenDiff , "rank": rank }  
-                            self.mpiComunication.append(mpiOpenTimeRecord)  
+                            self.mpiOpenComunication.append(mpiOpenTimeRecord)  
 
         print(f'Number of Records: {len(self.records)}')             
 
@@ -154,10 +161,11 @@ class MyPlot(object):
         df2= pd.DataFrame(self.records2)
         df3= pd.DataFrame(self.records3)
         df4= pd.DataFrame(self.records4)
-        if self.mpiComunication is not None and len(self.mpiComunication) > 0:
-            self.df_mpiComunication= pd.DataFrame(self.mpiComunication)
+        if self.mpiOpenComunication is not None and len(self.mpiOpenComunication) > 0:
+            self.df_mpiOpenComunication= pd.DataFrame(self.mpiOpenComunication)
         else:
-            self.df_mpiComunication= None
+            self.df_mpiOpenComunication= None
+        df_simulation = pd.DataFrame(self.Simulations)
 
         sum_scenarios= df.groupby(["experiment","scenario"])["timeSec"].sum()
 
@@ -175,8 +183,16 @@ class MyPlot(object):
         min_time_per_scenario = sum_scenarios.min() 
         
     
-        avg_simulation = statistics.mean(self.Simulations)
-        stdev_simulation  = statistics.stdev(self.Simulations)
+        #avg_simulation = statistics.mean(self.Simulations)
+        avg_simulation = df_simulation.groupby(["experiment"])["hour_simulation"].mean()        
+        stdev_simulation  = avg_simulation.std()
+
+        Avg_comunication_per_process = df_simulation.groupby(["experiment"])["comunication"].mean()        
+        stdev_comunication_per_process = Avg_comunication_per_process.std()
+
+        #Falta desvio padrao de comunicacao por processo
+        print(f'Avg Simulation per Process(s): {avg_simulation}') 
+        print(f'StdDev Simulation per Process(s): {stdev_simulation}') 
         #print(f'Number Buffers: {self.records.count}')                
         print(f'AVG per Scenarios: {avg_time_per_scenario}')        
         print(f'Stdev per Scenarios: {stdev_time_per_scenario}')  
@@ -227,14 +243,14 @@ class MyPlot(object):
         
         #sum_time= sum(self.diffs)
         #Calcula o tempo medio de cada cenario e depois multiplica pelo numero de cenario executado por processo.
-        avg_per_process = df.groupby(["experiment","rank"])["timeSec"].sum().mean()        
-        std_per_process = df.groupby(["experiment","rank"])["timeSec"].sum().std()        
+        Avg_io_per_process = df.groupby(["experiment","rank"])["timeSec"].sum().mean()        
+        std_io_per_process = df.groupby(["experiment","rank"])["timeSec"].sum().std()        
         # # Average time per process)
-        print(f'Avg Comunication per Process(s): {avg_per_process}') 
-        print(f'Std Comunication per Process(s): {std_per_process}') 
-        #Falta desvio padrao de comunicacao por processo
-        print(f'Avg Simulation per Process(s): {avg_simulation}') 
-        print(f'StdDev Simulation per Process(s): {stdev_simulation}') 
+        print(f'Avg Comunication per Process(s): {Avg_io_per_process}') 
+        print(f'Std Comunication per Process(s): {std_io_per_process}') 
+        
+        
+     
 
         
         # Banda agregada com janelas de tempo fixas para capturar concorrência real entre ranks
@@ -266,11 +282,11 @@ class MyPlot(object):
         print(f'Stdev Aggregate Bandwidth (Gb/s): {stddev_bandwidth:.2f}')
 
 
-        if self.df_mpiComunication is None:
+        if self.df_mpiOpenComunication is None:
             avg_mpiopen= 0
             stdev_mpiopen=0
         else:
-            sum_mpiopen= self.df_mpiComunication.groupby(["experiment","rank"])["timeSec"].sum()
+            sum_mpiopen= self.df_mpiOpenComunication.groupby(["experiment","rank"])["timeSec"].sum()
             avg_mpiopen = sum_mpiopen.groupby("experiment").mean().mean()
             stdev_mpiopen = sum_mpiopen.groupby("experiment").mean().std()      
               
@@ -278,11 +294,13 @@ class MyPlot(object):
         print(f'Stdev MPIOpen (s)): {stdev_mpiopen:.2f}')        
         
         
+        
+        
         if not desabilitaEscreverCsv:
             print("Writing CSV file...")
             self.escreveCsv({ 'Nodes': self.number_nodes, 
                                 'Avg_Simulation': avg_simulation , 'Stdev_simulation': stdev_simulation,
-                                'Avg_comunication_time_per_process': avg_per_process, 'std_per_process': std_per_process,
+                                'Avg_io_per_process': Avg_io_per_process, 'Stdev_io_per_process': std_io_per_process,
                                 'Avg_time_per_scenario': avg_time_per_scenario ,'Stdev_time_per_scenario': stdev_time_per_scenario,
                                 'Avg_bandwidth': avg_agregate_bandwidth, 'Stddev_bandwidth': stddev_bandwidth,
                                 'worstScenario': self.worstScenario, 'max_time_per_scenario': max_time_per_scenario,
@@ -291,7 +309,9 @@ class MyPlot(object):
                                 'Avg_time_per_record2': Avg_time_per_record2 ,'Stdev_time_per_record2': Stdev_time_per_record2,
                                 'Avg_time_per_record3': Avg_time_per_record3 ,'Stdev_time_per_record3': Stdev_time_per_record3,
                                 'Avg_time_per_record4': Avg_time_per_record4 ,'Stdev_time_per_record4': Stdev_time_per_record4,
-                                "Avg_mpiComunication": avg_mpiopen, 'Stdev_mpiComunication': stdev_mpiopen
+                                "Avg_comunication_per_process": Avg_comunication_per_process, 'std_comunication_per_process': stdev_comunication_per_process,
+                                "Avg_mpiopen_per_process": avg_mpiopen, 'std_mpiopen_per_process': stdev_mpiopen
+
                                 } )  
         
 
@@ -299,7 +319,7 @@ class MyPlot(object):
         path_csv = os.path.join(self.base_directory,"../plot.csv")
         cabecalho = ["Nodes", 
                      "Avg_Simulation", "Stdev_simulation",
-                     "Avg_comunication_time_per_process","std_per_process",
+                     "Avg_io_per_process","std_comunication_per_process",
                      "Avg_time_per_scenario",'Stdev_time_per_scenario',                     
                      "Avg_bandwidth", "Stddev_bandwidth",
                      "worstScenario", "max_time_per_scenario",
@@ -308,7 +328,8 @@ class MyPlot(object):
                      "Avg_time_per_record2", "Stdev_time_per_record2",
                      "Avg_time_per_record3", "Stdev_time_per_record3",
                      "Avg_time_per_record4", "Stdev_time_per_record4",
-                     "Avg_mpiComunication", 'Stdev_mpiComunication'
+                     "Avg_comunication_per_process ", 'Stdev_comunication_per_process',
+                     "Avg_mpiopen_per_process", "std_mpiopen_per_process"
                      ]
         escrever_cabecalho = not os.path.exists(path_csv) or os.path.getsize(path_csv) == 0
         with open(path_csv,mode='a',newline='',encoding='utf-8') as arquivo_csv:
@@ -346,7 +367,7 @@ class MyPlot(object):
 
         # plot com dois eixos y
         fig, ax1 = plt.subplots(figsize=(8, 5))
-        ax1.bar(X, avgBandwidth, yerr=stdDevBandwidth, capsize=8, color='lightgreen', edgecolor='black', label='Banda (Gb/s)')
+        ax1.bar(X, avgBandwidth, yerr=stdDevBandwidth, capsize=8, color='blue', edgecolor='black', label='Banda (Gb/s)')
         ax1.set_ylabel('Banda agregada média (Gb/s)', color='green')
         ax1.set_xlabel('Configuração')
         ax1.set_xticks(X)
