@@ -471,58 +471,150 @@ class MyPlot(object):
         plt.show()
 
 
-    def plotExecutionTime(self,base_directory,plotLabel):
-        
-        df_csv = pd.read_csv(os.path.join(base_directory,"../plot.csv"),index_col='Nodes')
-        df_len = len(df_csv)
-        X = np.zeros(df_len)
-        largura = 0.25        
-        categorias =  np.empty(df_len, dtype=object)
-        AvgSimulation = np.zeros(df_len)
-        Stdev_simulation = np.zeros(df_len)
-        Avg_io_process = np.zeros(df_len)
-        Stdev_time_per_process = np.zeros(df_len) 
-        Avg_mpiComunication = np.zeros(df_len)
-        Std_mpiComunication = np.zeros(df_len)
+    def plotExecutionTime(self, base_directory, plotLabel):
+        """Stacked bar com 4 componentes de tempo + percentual por segmento."""
+        df_csv = pd.read_csv(os.path.join(base_directory, "../plot.csv"), index_col='Nodes')
+        n = len(df_csv)
+        X = np.arange(n)
+        width = 0.5
+        categorias = [f"{df_csv.index[i]} Nodes" for i in range(n)]
 
+        avg_simulation = df_csv['Avg_Simulation'].values
+        avg_io         = df_csv['Avg_io_per_process'].values
+        avg_mpiopen    = df_csv['Avg_mpiopen_per_process'].values
+        avg_comm       = df_csv['Avg_comunication_per_process'].values
+        stdev_sim      = df_csv['Stdev_simulation'].values
+        stdev_io       = df_csv['Stdev_io_per_process'].values
+        stdev_comm     = df_csv['std_comunication_per_process'].values
+        stdev_mpiopen  = df_csv['std_mpiopen_per_process'].values
 
-        timePerScenarioBase = 0      
-        comunicationEstimate = 0         
-        for i in range(len(df_csv)):
-            X[i]= i
-            categorias[i]= f"{df_csv.index[i]} Nodes"            
-            AvgSimulation[i]= df_csv.iloc[i]['Avg_Simulation']                 
-            Stdev_simulation[i]= df_csv.iloc[i]['Stdev_simulation']
-            Avg_io_process[i] = df_csv.iloc[i]['Avg_comunication_time_per_process']
-            Stdev_time_per_process[i]= df_csv.iloc[i]['std_per_process']
-            # if i== 0:
-            #         timePerScenarioBase = df_csv.iloc[i]['Avg_Simulation']
-            # else:                
-            #     comunicationEstimate = df_csv.iloc[i]['Avg_Simulation'] - timePerScenarioBase/( 2**i) - Avg_io_process[i]
-            #     print(f"Comunication Estimate for {categorias[i]} Nodes: {comunicationEstimate:.2f} s")
-            if df_csv.iloc[i]['Avg_mpiComunication'] > 0:
-                Avg_mpiComunication[i]= 2 * df_csv.iloc[i]['Avg_mpiComunication'] + Avg_io_process[i]
-                Std_mpiComunication[i]= 2 * df_csv.iloc[i]['Stdev_mpiComunication']   
-            else:
-                Avg_mpiComunication[i]= Avg_io_process[i]
-                Std_mpiComunication[i]= Stdev_time_per_process[i]                       
-            AvgSimulation[i]= AvgSimulation[i] - Avg_mpiComunication[i]
-        
-        # Plotando com barras de erro vindas da outra série
-        plt.figure(figsize=(8,5))      
-        #error_kw = dict(elinewidth=1.5, capthick=1.5)
-        error_kw = dict(elinewidth=2.5, capthick=2.5, ecolor='black')
-        plt.bar(X , AvgSimulation, yerr=Stdev_simulation, label="Computação", width=largura, capsize=8, error_kw=error_kw, color='lightgreen', edgecolor='black')
-        plt.bar(X , Avg_mpiComunication, bottom=AvgSimulation, yerr=Std_mpiComunication, label="Comunicação", width=largura, capsize=8, error_kw=error_kw, color='blue', edgecolor='black')
+        # Computação = Simulação − E/S − Coletiva MPI
+        avg_comp   = np.maximum(avg_simulation - avg_io - avg_mpiopen, 0)
+        stdev_comp = np.sqrt(np.maximum(stdev_sim**2 - stdev_io**2 - stdev_mpiopen**2, 0))
+        total      = avg_comp + avg_comm + avg_io + avg_mpiopen
 
+        seg_vals   = [avg_comp,    avg_comm,    avg_io,   avg_mpiopen]
+        seg_stdevs = [stdev_comp,  stdev_comm,  stdev_io, stdev_mpiopen]
+        seg_colors = ['lightgreen', 'steelblue', 'salmon', 'gold']
+        seg_labels = ['Computação', 'Comunicação', 'E/S', 'Coletiva MPI']
 
-        plt.xticks(X, categorias)
-        plt.ylabel('tempo de execução médio (s)')
-        plt.grid(True, axis='y', linestyle='--', alpha=0.5)
+        fig, ax = plt.subplots(figsize=(10, 6))
+        bottoms = np.zeros(n)
+        bar_info = []
+        for vals, stds, color, lbl in zip(seg_vals, seg_stdevs, seg_colors, seg_labels):
+            ax.bar(X, vals, width, bottom=bottoms,
+                   color=color, edgecolor='black', label=lbl,
+                   yerr=stds, capsize=5,
+                   error_kw=dict(elinewidth=1.5, capthick=1.5, ecolor='black'))
+            bar_info.append((vals, bottoms.copy()))
+            bottoms += vals
 
-        plt.legend(loc='lower center', bbox_to_anchor=(0.5, 1.02), ncol=2)
+        # Percentual dentro de cada segmento
+        for (vals, bot) in bar_info:
+            for i in range(n):
+                pct = vals[i] / total[i] * 100 if total[i] > 0 else 0
+                if pct >= 4:
+                    ax.text(X[i], bot[i] + vals[i] / 2,
+                            f'{pct:.1f}%', ha='center', va='center',
+                            fontsize=9, fontweight='bold', color='black')
+
+        ax.set_xticks(X)
+        ax.set_xticklabels(categorias)
+        ax.set_ylabel('Tempo médio por processo (s)')
+        ax.set_title(f'Decomposição do Tempo de Execução — {plotLabel}')
+        ax.legend(loc='upper right')
+        ax.grid(True, axis='y', linestyle='--', alpha=0.5)
         plt.tight_layout()
+        plt.show()
 
+    def plotExecutionTimeComparison(self, experiments, plotLabel):
+        """
+        Compara tempo de execução entre experimentos (ex: centralizado vs descentralizado).
+
+        Parameters
+        ----------
+        experiments : list of (csv_path, label)
+            Cada entrada é o caminho direto para o plot.csv e um rótulo descritivo.
+        plotLabel : str
+            Título do gráfico.
+
+        Exemplo de uso
+        --------------
+        p.plotExecutionTimeComparison([
+            (r"...\\AWS\\Lustre - 1024 Series - Sem rede\\plot.csv",       "Centralizado"),
+            (r"...\\AWS\\Lustre - 1024 Series - Sem rede - MPIO\\plot.csv", "MPIO"),
+            (r"...\\AWS\\Lustre - 1024 Series - Sem rede - MPIO ASYNC\\plot.csv", "MPIO Async"),
+        ], "AWS")
+        """
+        from matplotlib.patches import Patch
+
+        dfs = {}
+        for csv_path, label in experiments:
+            dfs[label] = pd.read_csv(csv_path, index_col='Nodes')
+
+        all_nodes   = sorted(set.union(*[set(df.index) for df in dfs.values()]))
+        n_nodes     = len(all_nodes)
+        n_exp       = len(experiments)
+        width       = 0.7 / n_exp
+        X           = np.arange(n_nodes)
+
+        seg_colors  = ['lightgreen', 'steelblue', 'salmon', 'gold']
+        seg_labels  = ['Computação', 'Comunicação', 'E/S', 'Coletiva MPI']
+        exp_hatches = ['', '///', '...', 'xxx']
+
+        fig, ax = plt.subplots(figsize=(13, 6))
+
+        for j, (_, label) in enumerate(experiments):
+            df      = dfs[label]
+            offset  = (j - n_exp / 2 + 0.5) * width
+            hatch   = exp_hatches[j % len(exp_hatches)]
+
+            comp_v = []; comm_v = []; io_v = []; mpio_v = []
+            for node in all_nodes:
+                if node in df.index:
+                    row      = df.loc[node]
+                    avg_sim  = row['Avg_Simulation']
+                    avg_io   = row['Avg_io_per_process']
+                    avg_mpio = row['Avg_mpiopen_per_process']
+                    avg_comm = row['Avg_comunication_per_process']
+                    avg_comp = max(avg_sim - avg_io - avg_mpio, 0)
+                else:
+                    avg_comp = avg_comm = avg_io = avg_mpio = 0
+                comp_v.append(avg_comp); comm_v.append(avg_comm)
+                io_v.append(avg_io);     mpio_v.append(avg_mpio)
+
+            segs    = [np.array(v) for v in [comp_v, comm_v, io_v, mpio_v]]
+            totals  = sum(segs)
+            bottoms = np.zeros(n_nodes)
+
+            for vals, color in zip(segs, seg_colors):
+                ax.bar(X + offset, vals, width, bottom=bottoms,
+                       color=color, edgecolor='black', hatch=hatch,
+                       label='_nolegend_')
+                bottoms += vals
+
+            # Total e rótulo do experimento no topo de cada barra
+            for i, (x, tot) in enumerate(zip(X + offset, totals)):
+                if tot > 0:
+                    ax.text(x, tot * 1.005, f'{label}\n{tot:.0f}s',
+                            ha='center', va='bottom', fontsize=7)
+
+        # Legenda: cores = componentes, hachuras = experimentos
+        color_handles = [Patch(facecolor=c, edgecolor='black', label=l)
+                         for c, l in zip(seg_colors, seg_labels)]
+        hatch_handles = [Patch(facecolor='white', edgecolor='black',
+                               hatch=exp_hatches[j % len(exp_hatches)],
+                               label=lbl)
+                         for j, (_, lbl) in enumerate(experiments)]
+        ax.legend(handles=color_handles + hatch_handles,
+                  loc='upper right', fontsize=8, ncol=2)
+
+        ax.set_xticks(X)
+        ax.set_xticklabels([f"{n} Nodes" for n in all_nodes])
+        ax.set_ylabel('Tempo médio por processo (s)')
+        ax.set_title(f'Comparação de Experimentos — {plotLabel}')
+        ax.grid(True, axis='y', linestyle='--', alpha=0.5)
+        plt.tight_layout()
         plt.show()
     
     def PlotHistogram(self,max_size_kb=0):
