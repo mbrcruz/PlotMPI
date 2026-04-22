@@ -184,11 +184,11 @@ class MyPlot(object):
     
         #avg_simulation = statistics.mean(self.Simulations)
         avg_simulation = df_simulation.groupby("experiment")["hourly_simulation"].mean().mean()         
-        stdev_simulation  = avg_simulation.std()
+        stdev_simulation  = df_simulation.groupby("experiment")["hourly_simulation"].mean().std()
         
 
         Avg_comunication_per_process = df_simulation.groupby("experiment")["comunication"].mean().mean()   
-        stdev_comunication_per_process = Avg_comunication_per_process.std()
+        stdev_comunication_per_process =df_simulation.groupby("experiment")["comunication"].mean().std()
 
         print(f'Avg Comunication per Process(s): {Avg_comunication_per_process}')
         print(f'StdDev Comunication per Process(s): {stdev_comunication_per_process}')
