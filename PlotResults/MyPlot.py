@@ -183,12 +183,11 @@ class MyPlot(object):
         
     
         #avg_simulation = statistics.mean(self.Simulations)
-        avg_simulation = df_simulation.groupby("experiment")["hourly_simulation"].mean()    
-        print(avg_simulation)    
+        avg_simulation = df_simulation.groupby("experiment")["hourly_simulation"].mean().mean()         
         stdev_simulation  = avg_simulation.std()
-        print(stdev_simulation)
+        
 
-        Avg_comunication_per_process = df_simulation.groupby("experiment")["comunication"].mean()     
+        Avg_comunication_per_process = df_simulation.groupby("experiment")["comunication"].mean().mean()   
         stdev_comunication_per_process = Avg_comunication_per_process.std()
 
         print(f'Avg Comunication per Process(s): {Avg_comunication_per_process}')
@@ -313,8 +312,8 @@ class MyPlot(object):
                                 'Avg_time_per_record2': Avg_time_per_record2 ,'Stdev_time_per_record2': Stdev_time_per_record2,
                                 'Avg_time_per_record3': Avg_time_per_record3 ,'Stdev_time_per_record3': Stdev_time_per_record3,
                                 'Avg_time_per_record4': Avg_time_per_record4 ,'Stdev_time_per_record4': Stdev_time_per_record4,
-                                "Avg_comunication_per_process": Avg_comunication_per_process, 'std_comunication_per_process': stdev_comunication_per_process,
-                                "Avg_mpiopen_per_process": avg_mpiopen, 'std_mpiopen_per_process': stdev_mpiopen
+                                'Avg_comunication_per_process': Avg_comunication_per_process, 'std_comunication_per_process': stdev_comunication_per_process,
+                                'Avg_mpiopen_per_process': avg_mpiopen, 'std_mpiopen_per_process': stdev_mpiopen
 
                                 } )  
         
@@ -323,7 +322,7 @@ class MyPlot(object):
         path_csv = os.path.join(self.base_directory,"../plot.csv")
         cabecalho = ["Nodes", 
                      "Avg_Simulation", "Stdev_simulation",
-                     "Avg_io_per_process","std_comunication_per_process",
+                     "Avg_io_per_process","Stdev_io_per_process",
                      "Avg_time_per_scenario",'Stdev_time_per_scenario',                     
                      "Avg_bandwidth", "Stddev_bandwidth",
                      "worstScenario", "max_time_per_scenario",
@@ -332,7 +331,7 @@ class MyPlot(object):
                      "Avg_time_per_record2", "Stdev_time_per_record2",
                      "Avg_time_per_record3", "Stdev_time_per_record3",
                      "Avg_time_per_record4", "Stdev_time_per_record4",
-                     "Avg_comunication_per_process ", 'Stdev_comunication_per_process',
+                     "Avg_comunication_per_process", "std_comunication_per_process",
                      "Avg_mpiopen_per_process", "std_mpiopen_per_process"
                      ]
         escrever_cabecalho = not os.path.exists(path_csv) or os.path.getsize(path_csv) == 0
