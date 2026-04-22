@@ -509,40 +509,42 @@ class MyPlot(object):
         # Limiar: segmento é "pequeno" se < 4% do maior total
         vis_threshold = total.max() * 0.04
 
+        # Segmentos com valor zero em TODAS as barras não entram na legenda
+        legend_mask = [np.any(v > 0) for v in seg_vals]
+
         fig, ax = plt.subplots(figsize=(11, 7))
         ax2 = ax.twinx()
 
         bottoms = np.zeros(n)
         bar_info = []
-        for vals, stds, color, lbl in zip(seg_vals, seg_stdevs, seg_colors, seg_labels):
+        for vals, stds, color, lbl, in_legend in zip(seg_vals, seg_stdevs, seg_colors, seg_labels, legend_mask):
             ax.bar(X, vals, width, bottom=bottoms,
-                   color=color, edgecolor='white', linewidth=0.8, label=lbl,
+                   color=color, edgecolor='white', linewidth=0.8,
+                   label=lbl if in_legend else '_nolegend_',
                    yerr=stds, capsize=5,
                    error_kw=dict(elinewidth=1.5, capthick=1.5, ecolor='#444'))
             bar_info.append((vals, bottoms.copy()))
             bottoms += vals
 
         # Anotações — cor da seta e do texto igual à cor do segmento
-        # Para segmentos pequenos, alterna lado (esq/dir) e sobe o offset
-        # com base na ordem do segmento para evitar colisão
-        annot_y_offsets = [30, 55, 80, 105]   # um nível por segmento
+        annot_y_offsets = [30, 55, 80, 105]
         for seg_idx, (vals, bot, color) in enumerate(
                 zip([v for v, _ in bar_info],
                     [b for _, b in bar_info],
                     seg_colors)):
             for i in range(n):
+                if vals[i] == 0:        # omite label zero
+                    continue
                 pct = vals[i] / total[i] * 100 if total[i] > 0 else 0
                 label_txt = f'{pct:.1f}%\n{vals[i]:.1f}s'
                 seg_center_y = bot[i] + vals[i] / 2
 
                 if vals[i] >= vis_threshold:
-                    # Texto branco sobre fundo escuro, preto sobre claro
                     txt_color = 'white' if color in ('#1976d2',) else 'black'
                     ax.text(X[i], seg_center_y, label_txt,
                             ha='center', va='center',
                             fontsize=8, fontweight='bold', color=txt_color)
                 else:
-                    # Seta e texto na cor do segmento; alterna lado por coluna
                     side = 1 if (i + seg_idx) % 2 == 0 else -1
                     x_off = side * 48
                     y_off = annot_y_offsets[seg_idx % len(annot_y_offsets)]
@@ -563,8 +565,8 @@ class MyPlot(object):
 
         # Eixo direito espelhado (mesmo limite que esquerdo, escala em %)
         max_total = total.max()
-        ax.set_ylim(0, max_total * 1.30)
-        ax2.set_ylim(0, 100 * 1.30)
+        ax.set_ylim(0, max_total * 1.25)
+        ax2.set_ylim(0, 100 * 1.25)
         ax2.yaxis.set_major_formatter(mticker.FuncFormatter(lambda v, _: f'{v:.0f}%'))
         ax2.set_ylabel('Proporção do tempo total (%)', color='#555')
         ax2.tick_params(axis='y', labelcolor='#555')
@@ -576,31 +578,8 @@ class MyPlot(object):
         ax.grid(True, axis='y', linestyle='--', alpha=0.35)
 
         handles1, labels1 = ax.get_legend_handles_labels()
-        ax.legend(handles1, labels1, loc='upper right', fontsize=9,
-                  framealpha=0.9)
-
-        # Tabela resumo abaixo do gráfico
-        col_labels = categorias
-        row_labels = seg_labels + ['Total']
-        all_vals   = seg_vals + [total]
-        cell_text  = [[f'{v[i]:.1f}s' for i in range(n)] for v in all_vals]
-        tbl = ax.table(cellText=cell_text,
-                       rowLabels=row_labels,
-                       colLabels=col_labels,
-                       cellLoc='center',
-                       loc='bottom',
-                       bbox=[0, -0.38, 1, 0.28])
-        tbl.auto_set_font_size(False)
-        tbl.set_fontsize(8)
-        # Colorir a célula de cabeçalho de linha com a cor do segmento
-        for row_idx, color in enumerate(seg_colors):
-            tbl[(row_idx + 1, -1)].set_facecolor(color)
-            tbl[(row_idx + 1, -1)].set_text_props(color='black', fontweight='bold')
-        tbl[(len(seg_labels) + 1, -1)].set_facecolor('#e0e0e0')
-        tbl[(len(seg_labels) + 1, -1)].set_text_props(fontweight='bold')
-
-        plt.subplots_adjust(bottom=0.30)
-        plt.tight_layout(rect=[0, 0.28, 1, 1])
+        ax.legend(handles1, labels1, loc='upper right', fontsize=9, framealpha=0.9)
+        plt.tight_layout()
         plt.show()
 
     def plotExecutionTimeComparison(self, experiments, plotLabel):
