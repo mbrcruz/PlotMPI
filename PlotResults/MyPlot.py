@@ -473,8 +473,13 @@ class MyPlot(object):
 
     def plotExecutionTime(self, base_directory, plotLabel):
         """
-        Stacked bar 100% (eixo esquerdo) com label de tempo absoluto (s)
-        em cada segmento e segundo eixo Y (direito) mostrando o tempo total.
+        Stacked bar com alturas reais (tempo em segundos).
+        - Eixo esquerdo : tempo absoluto (s)
+        - Eixo direito  : % proporcional (espelhado ao eixo esquerdo)
+        - Segmentos grandes : label 'XX.X% / Xs' dentro do segmento
+        - Segmentos pequenos: anotação colorida com seta na cor do segmento,
+          posicionada alternadamente para evitar sobreposição
+        - Tabela resumo abaixo do gráfico com todos os valores
         """
         df_csv = pd.read_csv(os.path.join(base_directory, "../plot.csv"), index_col='Nodes')
         n = len(df_csv)
@@ -498,77 +503,104 @@ class MyPlot(object):
 
         seg_vals   = [avg_comp,   avg_comm,   avg_io,   avg_mpiopen]
         seg_stdevs = [stdev_comp, stdev_comm, stdev_io, stdev_mpiopen]
-        seg_colors = ['lightgreen', 'steelblue', 'salmon', 'gold']
+        seg_colors = ['#4caf50', '#1976d2', '#e57373', '#fbc02d']   # verde, azul, vermelho, âmbar
         seg_labels = ['Computação', 'Comunicação', 'E/S', 'Coletiva MPI']
 
-        # Normalizar para 100%
-        pct_vals = [np.where(total > 0, v / total * 100, 0) for v in seg_vals]
+        # Limiar: segmento é "pequeno" se < 4% do maior total
+        vis_threshold = total.max() * 0.04
 
-        fig, ax = plt.subplots(figsize=(10, 6))
-        ax2 = ax.twinx()   # segundo eixo Y (tempo absoluto total)
+        fig, ax = plt.subplots(figsize=(11, 7))
+        ax2 = ax.twinx()
 
-        bottoms_pct = np.zeros(n)
+        bottoms = np.zeros(n)
         bar_info = []
-        for pct, vals, stds, color, lbl in zip(pct_vals, seg_vals, seg_stdevs, seg_colors, seg_labels):
-            # Barras em % — sem error bars (ficam distorcidas no eixo normalizado)
-            ax.bar(X, pct, width, bottom=bottoms_pct,
-                   color=color, edgecolor='black', label=lbl)
-            bar_info.append((pct, vals, bottoms_pct.copy()))
-            bottoms_pct += pct
+        for vals, stds, color, lbl in zip(seg_vals, seg_stdevs, seg_colors, seg_labels):
+            ax.bar(X, vals, width, bottom=bottoms,
+                   color=color, edgecolor='white', linewidth=0.8, label=lbl,
+                   yerr=stds, capsize=5,
+                   error_kw=dict(elinewidth=1.5, capthick=1.5, ecolor='#444'))
+            bar_info.append((vals, bottoms.copy()))
+            bottoms += vals
 
-        # Label dentro de cada segmento: percentual + tempo absoluto
-        for (pct, vals, bot) in bar_info:
+        # Anotações — cor da seta e do texto igual à cor do segmento
+        # Para segmentos pequenos, alterna lado (esq/dir) e sobe o offset
+        # com base na ordem do segmento para evitar colisão
+        annot_y_offsets = [30, 55, 80, 105]   # um nível por segmento
+        for seg_idx, (vals, bot, color) in enumerate(
+                zip([v for v, _ in bar_info],
+                    [b for _, b in bar_info],
+                    seg_colors)):
             for i in range(n):
-                if pct[i] >= 2:                         # só mostra se o segmento for visível
-                    seg_center = bot[i] + pct[i] / 2
-                    # Formata o tempo: usa 'h' acima de 3600 s, 'min' acima de 60 s
-                    t = vals[i]
-                    if t >= 3600:
-                        t_lbl = f'{t/3600:.1f}h'
-                    elif t >= 60:
-                        t_lbl = f'{t/60:.1f}min'
-                    else:
-                        t_lbl = f'{t:.1f}s'
-                    ax.text(X[i], seg_center,
-                            f'{pct[i]:.1f}%\n({t_lbl})',
+                pct = vals[i] / total[i] * 100 if total[i] > 0 else 0
+                label_txt = f'{pct:.1f}%\n{vals[i]:.1f}s'
+                seg_center_y = bot[i] + vals[i] / 2
+
+                if vals[i] >= vis_threshold:
+                    # Texto branco sobre fundo escuro, preto sobre claro
+                    txt_color = 'white' if color in ('#1976d2',) else 'black'
+                    ax.text(X[i], seg_center_y, label_txt,
                             ha='center', va='center',
-                            fontsize=8, fontweight='bold', color='black')
+                            fontsize=8, fontweight='bold', color=txt_color)
+                else:
+                    # Seta e texto na cor do segmento; alterna lado por coluna
+                    side = 1 if (i + seg_idx) % 2 == 0 else -1
+                    x_off = side * 48
+                    y_off = annot_y_offsets[seg_idx % len(annot_y_offsets)]
+                    ax.annotate(label_txt,
+                                xy=(X[i], seg_center_y),
+                                xytext=(x_off, y_off),
+                                textcoords='offset points',
+                                fontsize=7.5, color=color,
+                                fontweight='bold', ha='center',
+                                arrowprops=dict(arrowstyle='->', color=color,
+                                                lw=1.2))
 
-        # Segundo eixo: pontos com tempo total absoluto por barra
-        ax2.plot(X, total, 'D--', color='darkred', linewidth=1.5,
-                 markersize=7, label='Total (s)', zorder=5)
+        # Total no topo de cada barra
         for i, tot in enumerate(total):
-            if tot >= 3600:
-                t_lbl = f'{tot/3600:.2f}h'
-            elif tot >= 60:
-                t_lbl = f'{tot/60:.1f}min'
-            else:
-                t_lbl = f'{tot:.1f}s'
-            ax2.annotate(t_lbl, (X[i], tot),
-                         textcoords='offset points', xytext=(6, 4),
-                         fontsize=8, color='darkred', fontweight='bold')
+            ax.text(X[i], tot + total.max() * 0.01,
+                    f'{tot:.0f}s', ha='center', va='bottom',
+                    fontsize=9, fontweight='bold', color='black')
 
-        # Eixo principal: 0–100%
-        ax.set_ylim(0, 100)
-        ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda v, _: f'{v:.0f}%'))
-        ax.set_ylabel('Proporção do tempo (%)')
+        # Eixo direito espelhado (mesmo limite que esquerdo, escala em %)
+        max_total = total.max()
+        ax.set_ylim(0, max_total * 1.30)
+        ax2.set_ylim(0, 100 * 1.30)
+        ax2.yaxis.set_major_formatter(mticker.FuncFormatter(lambda v, _: f'{v:.0f}%'))
+        ax2.set_ylabel('Proporção do tempo total (%)', color='#555')
+        ax2.tick_params(axis='y', labelcolor='#555')
 
-        # Eixo secundário: tempo em segundos
-        ax2.set_ylabel('Tempo total por processo (s)', color='darkred')
-        ax2.tick_params(axis='y', labelcolor='darkred')
-        ax2.set_ylim(0, total.max() * 1.2)
-
+        ax.set_ylabel('Tempo médio por processo (s)')
         ax.set_xticks(X)
         ax.set_xticklabels(categorias)
-        ax.set_title(f'Decomposição do Tempo de Execução — {plotLabel}')
-        ax.grid(True, axis='y', linestyle='--', alpha=0.4)
+        ax.set_title(f'Decomposição do Tempo de Execução — {plotLabel}', fontsize=12)
+        ax.grid(True, axis='y', linestyle='--', alpha=0.35)
 
-        # Legenda unificada
         handles1, labels1 = ax.get_legend_handles_labels()
-        handles2, labels2 = ax2.get_legend_handles_labels()
-        ax.legend(handles1 + handles2, labels1 + labels2,
-                  loc='upper right', fontsize=8)
-        plt.tight_layout()
+        ax.legend(handles1, labels1, loc='upper right', fontsize=9,
+                  framealpha=0.9)
+
+        # Tabela resumo abaixo do gráfico
+        col_labels = categorias
+        row_labels = seg_labels + ['Total']
+        all_vals   = seg_vals + [total]
+        cell_text  = [[f'{v[i]:.1f}s' for i in range(n)] for v in all_vals]
+        tbl = ax.table(cellText=cell_text,
+                       rowLabels=row_labels,
+                       colLabels=col_labels,
+                       cellLoc='center',
+                       loc='bottom',
+                       bbox=[0, -0.38, 1, 0.28])
+        tbl.auto_set_font_size(False)
+        tbl.set_fontsize(8)
+        # Colorir a célula de cabeçalho de linha com a cor do segmento
+        for row_idx, color in enumerate(seg_colors):
+            tbl[(row_idx + 1, -1)].set_facecolor(color)
+            tbl[(row_idx + 1, -1)].set_text_props(color='black', fontweight='bold')
+        tbl[(len(seg_labels) + 1, -1)].set_facecolor('#e0e0e0')
+        tbl[(len(seg_labels) + 1, -1)].set_text_props(fontweight='bold')
+
+        plt.subplots_adjust(bottom=0.30)
+        plt.tight_layout(rect=[0, 0.28, 1, 1])
         plt.show()
 
     def plotExecutionTimeComparison(self, experiments, plotLabel):
