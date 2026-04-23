@@ -344,8 +344,9 @@ class MyPlot(object):
             
     def plotBandwidth(self,base_directory,plotLabel):
         
-
-
+        if self.records is None or len(self.records) == 0:
+            self.load_data(number_experiments=1)
+            
         df = pd.DataFrame(self.records)
 
         # calcula tamanho médio por cenário (GB)
@@ -489,7 +490,7 @@ class MyPlot(object):
 
         avg_simulation = df_csv['Avg_Simulation'].values
         avg_io         = df_csv['Avg_io_per_process'].values
-        avg_mpiopen    = df_csv['Avg_mpiopen_per_process'].values
+        avg_mpiopen    = df_csv['Avg_mpiopen_per_process'].values * 3
         avg_comm       = df_csv['Avg_comunication_per_process'].values
         stdev_sim      = df_csv['Stdev_simulation'].values
         stdev_io       = df_csv['Stdev_io_per_process'].values
