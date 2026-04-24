@@ -472,114 +472,156 @@ class MyPlot(object):
         plt.show()
 
 
-    def plotExecutionTime(self, base_directory, plotLabel):
+    def plotExecutionTime(self, experiments, plotLabel):
         """
-        Stacked bar com alturas reais (tempo em segundos).
-        - Eixo esquerdo : tempo absoluto (s)
-        - Eixo direito  : % proporcional (espelhado ao eixo esquerdo)
-        - Segmentos grandes : label 'XX.X% / Xs' dentro do segmento
-        - Segmentos pequenos: anotação colorida com seta na cor do segmento,
-          posicionada alternadamente para evitar sobreposição
-        - Tabela resumo abaixo do gráfico com todos os valores
+        Stacked bar com alturas reais (s), barras lado a lado por experimento.
+
+        Parameters
+        ----------
+        experiments : list of (csv_path, label)
+            Caminho direto para plot.csv e rótulo descritivo.
+            Exemplo:
+                [
+                    (r"...\\Sem rede\\plot.csv",       "Centralizado"),
+                    (r"...\\Sem rede - MPIO\\plot.csv", "MPI-IO"),
+                ]
+        plotLabel : str  — título do gráfico
+
+        Cada grupo no eixo X representa uma contagem de nós.
+        Dentro do grupo há uma barra por experimento, lado a lado.
         """
-        df_csv = pd.read_csv(os.path.join(base_directory, "../plot.csv"), index_col='Nodes')
-        n = len(df_csv)
-        X = np.arange(n)
-        width = 0.5
-        categorias = [f"{df_csv.index[i]} Nodes" for i in range(n)]
-
-        avg_simulation = df_csv['Avg_Simulation'].values
-        avg_io         = df_csv['Avg_io_per_process'].values
-        avg_mpiopen    = df_csv['Avg_mpiopen_per_process'].values * 3
-        avg_comm       = df_csv['Avg_comunication_per_process'].values
-        stdev_sim      = df_csv['Stdev_simulation'].values
-        stdev_io       = df_csv['Stdev_io_per_process'].values
-        stdev_comm     = df_csv['std_comunication_per_process'].values
-        stdev_mpiopen  = df_csv['std_mpiopen_per_process'].values
-
-        # Computação = Simulação − E/S − Coletiva MPI
-        avg_comp   = np.maximum(avg_simulation - avg_io - avg_mpiopen, 0)
-        stdev_comp = np.sqrt(np.maximum(stdev_sim**2 - stdev_io**2 - stdev_mpiopen**2, 0))
-        total      = avg_comp + avg_comm + avg_io + avg_mpiopen
-
-        seg_vals   = [avg_comp,   avg_comm,   avg_io,   avg_mpiopen]
-        seg_stdevs = [stdev_comp, stdev_comm, stdev_io, stdev_mpiopen]
-        seg_colors = ['#4caf50', '#1976d2', '#e57373', '#fbc02d']   # verde, azul, vermelho, âmbar
+        seg_colors = ['#4caf50', '#1976d2', '#e57373', '#fbc02d']
         seg_labels = ['Computação', 'Comunicação', 'E/S', 'Coletiva MPI']
+        exp_hatches = ['', '///', '...', 'xxx']
+        dark_text_colors = {'#1976d2'}   # segmentos com fundo escuro → texto branco
 
-        # Limiar: segmento é "pequeno" se < 4% do maior total
-        vis_threshold = total.max() * 0.04
+        def _load(csv_path):
+            df = pd.read_csv(csv_path, index_col='Nodes')
+            avg_sim    = df['Avg_Simulation'].values
+            avg_io     = df['Avg_io_per_process'].values
+            avg_mpio   = df['Avg_mpiopen_per_process'].values * 6
+            avg_comm   = df['Avg_comunication_per_process'].values
+            stdev_sim  = df['Stdev_simulation'].values
+            stdev_io   = df['Stdev_io_per_process'].values
+            stdev_comm = df['std_comunication_per_process'].values
+            stdev_mpio = df['std_mpiopen_per_process'].values
+            avg_comp   = np.maximum(avg_sim - avg_io - avg_mpio, 0)
+            stdev_comp = np.sqrt(np.maximum(stdev_sim**2 - stdev_io**2 - stdev_mpio**2, 0))
+            total      = avg_comp + avg_comm + avg_io + avg_mpio
+            seg_v = [avg_comp, avg_comm, avg_io, avg_mpio]
+            seg_s = [stdev_comp, stdev_comm, stdev_io, stdev_mpio]
+            return df.index.tolist(), seg_v, seg_s, total
 
-        # Segmentos com valor zero em TODAS as barras não entram na legenda
-        legend_mask = [np.any(v > 0) for v in seg_vals]
+        # Carrega todos os CSVs e determina nós em comum (ordem do primeiro)
+        loaded = [_load(p) for p, _ in experiments]
+        all_nodes = loaded[0][0]   # preserva ordem do primeiro CSV
+        n_nodes   = len(all_nodes)
+        n_exp     = len(experiments)
+        width     = 0.75 / n_exp
+        gap       = 0.05           # espaço entre grupos
+        X         = np.arange(n_nodes) * (0.75 + gap + 0.1)
 
-        fig, ax = plt.subplots(figsize=(11, 7))
+        # Limiar global para decidir label dentro vs seta
+        global_max = max(t.max() for _, _, _, t in loaded)
+        vis_threshold = global_max * 0.04
+
+        # Máscara de legenda de segmento: só entra se algum experimento tem valor > 0
+        legend_mask = [
+            any(np.any(loaded[j][1][s] > 0) for j in range(n_exp))
+            for s in range(len(seg_labels))
+        ]
+
+        fig, ax = plt.subplots(figsize=(max(11, n_nodes * n_exp * 1.8), 7))
         ax2 = ax.twinx()
 
-        bottoms = np.zeros(n)
-        bar_info = []
-        for vals, stds, color, lbl, in_legend in zip(seg_vals, seg_stdevs, seg_colors, seg_labels, legend_mask):
-            ax.bar(X, vals, width, bottom=bottoms,
-                   color=color, edgecolor='white', linewidth=0.8,
-                   label=lbl if in_legend else '_nolegend_',
-                   yerr=stds, capsize=5,
-                   error_kw=dict(elinewidth=1.5, capthick=1.5, ecolor='#444'))
-            bar_info.append((vals, bottoms.copy()))
-            bottoms += vals
+        # Coleta todos os bar_info para depois empilhar os labels acima das barras
+        # sem cruzamentos: cada barra tem sua própria fila de labels pequenos
+        all_small = {}   # (bar_x_val, i) -> lista de (y_base, label_txt, color)
 
-        # Anotações — cor da seta e do texto igual à cor do segmento
-        annot_y_offsets = [30, 55, 80, 105]
-        for seg_idx, (vals, bot, color) in enumerate(
-                zip([v for v, _ in bar_info],
-                    [b for _, b in bar_info],
-                    seg_colors)):
-            for i in range(n):
-                if vals[i] == 0:        # omite label zero
-                    continue
-                pct = vals[i] / total[i] * 100 if total[i] > 0 else 0
-                label_txt = f'{pct:.1f}%\n{vals[i]:.1f}s'
-                seg_center_y = bot[i] + vals[i] / 2
+        for j, ((_, exp_label), (nodes, seg_v, seg_s, total)) in enumerate(
+                zip(experiments, loaded)):
+            hatch   = exp_hatches[j % len(exp_hatches)]
+            bar_off = (j - n_exp / 2 + 0.5) * width
+            bar_x   = X + bar_off
 
-                if vals[i] >= vis_threshold:
-                    txt_color = 'white' if color in ('#1976d2',) else 'black'
-                    ax.text(X[i], seg_center_y, label_txt,
-                            ha='center', va='center',
-                            fontsize=8, fontweight='bold', color=txt_color)
-                else:
-                    side = 1 if (i + seg_idx) % 2 == 0 else -1
-                    x_off = side * 48
-                    y_off = annot_y_offsets[seg_idx % len(annot_y_offsets)]
-                    ax.annotate(label_txt,
-                                xy=(X[i], seg_center_y),
-                                xytext=(x_off, y_off),
-                                textcoords='offset points',
-                                fontsize=7.5, color=color,
-                                fontweight='bold', ha='center',
-                                arrowprops=dict(arrowstyle='->', color=color,
-                                                lw=1.2))
+            bottoms  = np.zeros(n_nodes)
+            bar_info = []
 
-        # Total no topo de cada barra
-        for i, tot in enumerate(total):
-            ax.text(X[i], tot + total.max() * 0.01,
-                    f'{tot:.0f}s', ha='center', va='bottom',
-                    fontsize=9, fontweight='bold', color='black')
+            for s_idx, (vals, stds, color, slbl, in_leg) in enumerate(
+                    zip(seg_v, seg_s, seg_colors, seg_labels, legend_mask)):
+                legend_lbl = slbl if (in_leg and j == 0) else '_nolegend_'
+                ax.bar(bar_x, vals, width, bottom=bottoms,
+                       color=color, edgecolor='white', linewidth=0.6,
+                       hatch=hatch, label=legend_lbl,
+                       yerr=stds, capsize=4,
+                       error_kw=dict(elinewidth=1.2, capthick=1.2, ecolor='#555'))
+                bar_info.append((vals, bottoms.copy()))
+                bottoms += vals
 
-        # Eixo direito espelhado (mesmo limite que esquerdo, escala em %)
-        max_total = total.max()
-        ax.set_ylim(0, max_total * 1.25)
-        ax2.set_ylim(0, 100 * 1.25)
+            for s_idx, (vals, bot) in enumerate(bar_info):
+                color = seg_colors[s_idx]
+                for i in range(n_nodes):
+                    if vals[i] == 0:
+                        continue
+                    pct = vals[i] / total[i] * 100 if total[i] > 0 else 0
+                    label_txt = f'{pct:.1f}%\n{vals[i]:.1f}s'
+                    seg_cy = bot[i] + vals[i] / 2
+
+                    if vals[i] >= vis_threshold:
+                        # Label dentro do segmento
+                        tc = 'white' if color in dark_text_colors else 'black'
+                        ax.text(bar_x[i], seg_cy, label_txt,
+                                ha='center', va='center',
+                                fontsize=7, fontweight='bold', color=tc)
+                    else:
+                        # Acumula para renderizar empilhado acima da barra
+                        key = (round(bar_x[i], 6), i)
+                        all_small.setdefault(key, {'total': total[i], 'items': []})
+                        all_small[key]['items'].append((label_txt, color))
+
+            # Rótulo do experimento + total no topo de cada barra
+            for i, tot in enumerate(total):
+                ax.text(bar_x[i], tot + global_max * 0.005,
+                        f'{exp_label}  {tot:.0f}s',
+                        ha='center', va='bottom', fontsize=7,
+                        fontweight='bold', color='#222')
+
+        # Renderiza labels pequenos empilhados acima do topo, sem setas nem cruzamentos
+        line_h = global_max * 0.055   # altura de cada linha de texto
+        for key, data in all_small.items():
+            bx    = key[0]
+            y_cur = data['total'] + global_max * 0.09   # começa logo acima do rótulo do total
+            for label_txt, color in data['items']:
+                ax.text(bx, y_cur, label_txt,
+                        ha='center', va='bottom',
+                        fontsize=6.5, fontweight='bold', color=color,
+                        bbox=dict(boxstyle='round,pad=0.15', fc='white',
+                                  ec=color, lw=0.8, alpha=0.85))
+                y_cur += line_h * (label_txt.count('\n') + 1)
+
+        # Eixo direito espelhado
+        ax.set_ylim(0, global_max * 1.55)
+        ax2.set_ylim(0, 100 * 1.55)
         ax2.yaxis.set_major_formatter(mticker.FuncFormatter(lambda v, _: f'{v:.0f}%'))
         ax2.set_ylabel('Proporção do tempo total (%)', color='#555')
         ax2.tick_params(axis='y', labelcolor='#555')
 
-        ax.set_ylabel('Tempo médio por processo (s)')
         ax.set_xticks(X)
-        ax.set_xticklabels(categorias)
+        ax.set_xticklabels([f'{nd} Nodes' for nd in all_nodes])
+        ax.set_ylabel('Tempo médio por processo (s)')
         ax.set_title(f'Decomposição do Tempo de Execução — {plotLabel}', fontsize=12)
         ax.grid(True, axis='y', linestyle='--', alpha=0.35)
 
-        handles1, labels1 = ax.get_legend_handles_labels()
-        ax.legend(handles1, labels1, loc='upper right', fontsize=9, framealpha=0.9)
+        # Legenda: cores = segmentos + hachuras = experimentos
+        from matplotlib.patches import Patch
+        seg_handles = [Patch(facecolor=c, edgecolor='white', label=l)
+                       for c, l, m in zip(seg_colors, seg_labels, legend_mask) if m]
+        exp_handles = [Patch(facecolor='#ccc', edgecolor='black',
+                             hatch=exp_hatches[j % len(exp_hatches)], label=lbl)
+                       for j, (_, lbl) in enumerate(experiments)]
+        ax.legend(handles=seg_handles + exp_handles,
+                  loc='upper right', fontsize=8, framealpha=0.9, ncol=2)
+
         plt.tight_layout()
         plt.show()
 
