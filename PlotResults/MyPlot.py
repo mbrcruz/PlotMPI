@@ -39,8 +39,8 @@ class MyPlot(object):
         self.X4=[]
         self.records=[]
         self.Simulations=[]
-        self.df_mpiOpenComunication=[]
-        self.mpiOpenComunication=[]
+        self.df_mpiCollective=[]
+        self.mpiCollective=[]
         self.localScenarios=[]   
         self.bestScenario=0
         self.worstScenario=0 
@@ -133,13 +133,13 @@ class MyPlot(object):
                     self.Simulations.append(simulation)
 
                     # load mpi comunication times if exist
-                    if os.path.exists(os.path.join(self.base_directory , str(experiment+1), f"mpiio-open-{rank}.log")):
-                        self.df_mpiOpenComunication= pd.read_csv(os.path.join(self.base_directory , str(experiment+1), f"mpiio-open-{rank}.log"),header=None)
-                        for k in range(len(self.df_mpiOpenComunication)):
-                            mpiopenDiff= self.df_mpiOpenComunication.iloc[k,3] - self.df_mpiOpenComunication.iloc[k,2]
-                            mpiOpenTimeRecord={}
-                            mpiOpenTimeRecord= { "experiment": experiment+1, 'timeSec': mpiopenDiff , "rank": rank }  
-                            self.mpiOpenComunication.append(mpiOpenTimeRecord)  
+                    if os.path.exists(os.path.join(self.base_directory , str(experiment+1), f"mpiio-collective-{rank}.log")):
+                        self.df_mpiCollective= pd.read_csv(os.path.join(self.base_directory , str(experiment+1), f"mpiio-collective-{rank}.log"),header=None)
+                        for k in range(len(self.df_mpiCollective)):
+                            mpiCollectiveDiff= self.df_mpiCollective.iloc[k,4] - self.df_mpiCollective.iloc[k,3]
+                            mpiCollectiveTimeRecord={}
+                            mpiCollectiveTimeRecord= { "experiment": experiment+1, 'timeSec': mpiCollectiveDiff , "rank": rank }  
+                            self.mpiCollective.append(mpiCollectiveTimeRecord)  
 
         print(f'Number of Records: {len(self.records)}')             
 
@@ -162,10 +162,10 @@ class MyPlot(object):
         df3= pd.DataFrame(self.records3)
         df4= pd.DataFrame(self.records4)
         df_simulation = pd.DataFrame(self.Simulations)
-        if self.mpiOpenComunication is not None and len(self.mpiOpenComunication) > 0:
-            self.df_mpiOpenComunication= pd.DataFrame(self.mpiOpenComunication)
+        if self.mpiCollective is not None and len(self.mpiCollective) > 0:
+            self.df_mpiCollective= pd.DataFrame(self.mpiCollective)
         else:
-            self.df_mpiOpenComunication= None
+            self.df_mpiCollective= None
         
 
         sum_scenarios= df.groupby(["experiment","scenario"])["timeSec"].sum()
@@ -285,16 +285,17 @@ class MyPlot(object):
         print(f'Stdev Aggregate Bandwidth (Gb/s): {stddev_bandwidth:.2f}')
 
 
-        if self.df_mpiOpenComunication is None:
-            avg_mpiopen= 0
+        if self.df_mpiCollective is None:
+            avg_mpiCollective= 0
+            stdev_mpiCollective= 0
             stdev_mpiopen=0
         else:
-            sum_mpiopen= self.df_mpiOpenComunication.groupby(["experiment","rank"])["timeSec"].sum()
-            avg_mpiopen = sum_mpiopen.groupby("experiment").mean().mean()
-            stdev_mpiopen = sum_mpiopen.groupby("experiment").mean().std()      
+            sum_mpiCollective= self.df_mpiCollective.groupby(["experiment","rank"])["timeSec"].sum()
+            avg_mpiCollective = sum_mpiCollective.groupby("experiment").mean().mean()
+            stdev_mpiCollective = sum_mpiCollective.groupby("experiment").mean().std()
               
-        print(f'AVG MPIOpen (s): {avg_mpiopen:.2f}') 
-        print(f'Stdev MPIOpen (s)): {stdev_mpiopen:.2f}')        
+        print(f'AVG MPIOpen (s): {avg_mpiCollective:.2f}')        
+        print(f'Stdev MPIOpen (s)): {stdev_mpiCollective:.2f}')        
         
         
         
@@ -313,7 +314,7 @@ class MyPlot(object):
                                 'Avg_time_per_record3': Avg_time_per_record3 ,'Stdev_time_per_record3': Stdev_time_per_record3,
                                 'Avg_time_per_record4': Avg_time_per_record4 ,'Stdev_time_per_record4': Stdev_time_per_record4,
                                 'Avg_comunication_per_process': Avg_comunication_per_process, 'std_comunication_per_process': stdev_comunication_per_process,
-                                'Avg_mpiopen_per_process': avg_mpiopen, 'std_mpiopen_per_process': stdev_mpiopen
+                                'Avg_mpiCollective_per_process': avg_mpiCollective, 'std_mpiCollective_per_process': stdev_mpiCollective
 
                                 } )  
         
@@ -332,7 +333,7 @@ class MyPlot(object):
                      "Avg_time_per_record3", "Stdev_time_per_record3",
                      "Avg_time_per_record4", "Stdev_time_per_record4",
                      "Avg_comunication_per_process", "std_comunication_per_process",
-                     "Avg_mpiopen_per_process", "std_mpiopen_per_process"
+                     "Avg_mpiCollective_per_process", "std_mpiCollective_per_process"
                      ]
         escrever_cabecalho = not os.path.exists(path_csv) or os.path.getsize(path_csv) == 0
         with open(path_csv,mode='a',newline='',encoding='utf-8') as arquivo_csv:
@@ -344,14 +345,14 @@ class MyPlot(object):
             
     def plotBandwidth(self,base_directory,plotLabel):
         
-        if self.records is None or len(self.records) == 0:
-            self.load_data(number_experiments=1)
+        # if self.records is None or len(self.records) == 0:
+        #     self.load_data(number_experiments=1)
             
-        df = pd.DataFrame(self.records)
+        # df = pd.DataFrame(self.records)
 
-        # calcula tamanho médio por cenário (GB)
-        agrupados = df.groupby("scenario")[["sizeBytes"]].sum()
-        size_por_scenario = agrupados["sizeBytes"].mean() / 1e9
+        # # calcula tamanho médio por cenário (GB)
+        # agrupados = df.groupby("scenario")[["sizeBytes"]].sum()
+        # size_por_scenario = agrupados["sizeBytes"].mean() / 1e9
 
         # carrega CSV com métricas por configuração
         df_csv = pd.read_csv(os.path.join(base_directory, "../plot.csv"), index_col='Nodes')
@@ -364,10 +365,10 @@ class MyPlot(object):
         stdDevBandwidth = stdDevBandwidthScenario
 
         # calcula volume de dados por nó (GB) para segunda eixo y
-        sizePerNode = np.zeros(df_len)
-        for i in range(df_len):
-            total_size_per_nodes = (size_por_scenario * self.number_scenarios) / 2 ** ( i+1)
-            sizePerNode[i] = total_size_per_nodes
+        # sizePerNode = np.zeros(df_len)
+        # for i in range(df_len):
+        #     total_size_per_nodes = (size_por_scenario * self.number_scenarios) / 2 ** ( i+1)
+        #     sizePerNode[i] = total_size_per_nodes
 
         # plot com dois eixos y
         fig, ax1 = plt.subplots(figsize=(8, 5))
@@ -499,17 +500,17 @@ class MyPlot(object):
             df = pd.read_csv(csv_path, index_col='Nodes')
             avg_sim    = df['Avg_Simulation'].values
             avg_io     = df['Avg_io_per_process'].values
-            avg_mpio   = df['Avg_mpiopen_per_process'].values * 6
+            avg_mpioCollective   = df['Avg_mpiCollective_per_process'].values
             avg_comm   = df['Avg_comunication_per_process'].values
             stdev_sim  = df['Stdev_simulation'].values
             stdev_io   = df['Stdev_io_per_process'].values
             stdev_comm = df['std_comunication_per_process'].values
-            stdev_mpio = df['std_mpiopen_per_process'].values
-            avg_comp   = np.maximum(avg_sim - avg_io - avg_mpio, 0)
-            stdev_comp = np.sqrt(np.maximum(stdev_sim**2 - stdev_io**2 - stdev_mpio**2, 0))
-            total      = avg_comp + avg_comm + avg_io + avg_mpio
-            seg_v = [avg_comp, avg_comm, avg_io, avg_mpio]
-            seg_s = [stdev_comp, stdev_comm, stdev_io, stdev_mpio]
+            stdev_mpioCollective = df['std_mpiCollective_per_process'].values
+            avg_comp   = np.maximum(avg_sim - avg_io - avg_mpioCollective, 0)
+            stdev_comp = np.sqrt(np.maximum(stdev_sim**2 - stdev_io**2 - stdev_mpioCollective**2, 0))
+            total      = avg_comp + avg_comm + avg_io + avg_mpioCollective
+            seg_v = [avg_comp, avg_comm, avg_io, avg_mpioCollective]
+            seg_s = [stdev_comp, stdev_comm, stdev_io, stdev_mpioCollective]
             return df.index.tolist(), seg_v, seg_s, total
 
         # Carrega todos os CSVs e determina nós em comum (ordem do primeiro)
@@ -625,95 +626,95 @@ class MyPlot(object):
         plt.tight_layout()
         plt.show()
 
-    def plotExecutionTimeComparison(self, experiments, plotLabel):
-        """
-        Compara tempo de execução entre experimentos (ex: centralizado vs descentralizado).
+    # def plotExecutionTimeComparison(self, experiments, plotLabel):
+    #     """
+    #     Compara tempo de execução entre experimentos (ex: centralizado vs descentralizado).
 
-        Parameters
-        ----------
-        experiments : list of (csv_path, label)
-            Cada entrada é o caminho direto para o plot.csv e um rótulo descritivo.
-        plotLabel : str
-            Título do gráfico.
+    #     Parameters
+    #     ----------
+    #     experiments : list of (csv_path, label)
+    #         Cada entrada é o caminho direto para o plot.csv e um rótulo descritivo.
+    #     plotLabel : str
+    #         Título do gráfico.
 
-        Exemplo de uso
-        --------------
-        p.plotExecutionTimeComparison([
-            (r"...\\AWS\\Lustre - 1024 Series - Sem rede\\plot.csv",       "Centralizado"),
-            (r"...\\AWS\\Lustre - 1024 Series - Sem rede - MPIO\\plot.csv", "MPIO"),
-            (r"...\\AWS\\Lustre - 1024 Series - Sem rede - MPIO ASYNC\\plot.csv", "MPIO Async"),
-        ], "AWS")
-        """
-        from matplotlib.patches import Patch
+    #     Exemplo de uso
+    #     --------------
+    #     p.plotExecutionTimeComparison([
+    #         (r"...\\AWS\\Lustre - 1024 Series - Sem rede\\plot.csv",       "Centralizado"),
+    #         (r"...\\AWS\\Lustre - 1024 Series - Sem rede - MPIO\\plot.csv", "MPIO"),
+    #         (r"...\\AWS\\Lustre - 1024 Series - Sem rede - MPIO ASYNC\\plot.csv", "MPIO Async"),
+    #     ], "AWS")
+    #     """
+    #     from matplotlib.patches import Patch
 
-        dfs = {}
-        for csv_path, label in experiments:
-            dfs[label] = pd.read_csv(csv_path, index_col='Nodes')
+    #     dfs = {}
+    #     for csv_path, label in experiments:
+    #         dfs[label] = pd.read_csv(csv_path, index_col='Nodes')
 
-        all_nodes   = sorted(set.union(*[set(df.index) for df in dfs.values()]))
-        n_nodes     = len(all_nodes)
-        n_exp       = len(experiments)
-        width       = 0.7 / n_exp
-        X           = np.arange(n_nodes)
+    #     all_nodes   = sorted(set.union(*[set(df.index) for df in dfs.values()]))
+    #     n_nodes     = len(all_nodes)
+    #     n_exp       = len(experiments)
+    #     width       = 0.7 / n_exp
+    #     X           = np.arange(n_nodes)
 
-        seg_colors  = ['lightgreen', 'steelblue', 'salmon', 'gold']
-        seg_labels  = ['Computação', 'Comunicação', 'E/S', 'Coletiva MPI']
-        exp_hatches = ['', '///', '...', 'xxx']
+    #     seg_colors  = ['lightgreen', 'steelblue', 'salmon', 'gold']
+    #     seg_labels  = ['Computação', 'Comunicação', 'E/S', 'Coletiva MPI']
+    #     exp_hatches = ['', '///', '...', 'xxx']
 
-        fig, ax = plt.subplots(figsize=(13, 6))
+    #     fig, ax = plt.subplots(figsize=(13, 6))
 
-        for j, (_, label) in enumerate(experiments):
-            df      = dfs[label]
-            offset  = (j - n_exp / 2 + 0.5) * width
-            hatch   = exp_hatches[j % len(exp_hatches)]
+    #     for j, (_, label) in enumerate(experiments):
+    #         df      = dfs[label]
+    #         offset  = (j - n_exp / 2 + 0.5) * width
+    #         hatch   = exp_hatches[j % len(exp_hatches)]
 
-            comp_v = []; comm_v = []; io_v = []; mpio_v = []
-            for node in all_nodes:
-                if node in df.index:
-                    row      = df.loc[node]
-                    avg_sim  = row['Avg_Simulation']
-                    avg_io   = row['Avg_io_per_process']
-                    avg_mpio = row['Avg_mpiopen_per_process']
-                    avg_comm = row['Avg_comunication_per_process']
-                    avg_comp = max(avg_sim - avg_io - avg_mpio, 0)
-                else:
-                    avg_comp = avg_comm = avg_io = avg_mpio = 0
-                comp_v.append(avg_comp); comm_v.append(avg_comm)
-                io_v.append(avg_io);     mpio_v.append(avg_mpio)
+    #         comp_v = []; comm_v = []; io_v = []; mpio_v = []
+    #         for node in all_nodes:
+    #             if node in df.index:
+    #                 row      = df.loc[node]
+    #                 avg_sim  = row['Avg_Simulation']
+    #                 avg_io   = row['Avg_io_per_process']
+    #                 avg_mpio = row['Avg_mpiopen_per_process']
+    #                 avg_comm = row['Avg_comunication_per_process']
+    #                 avg_comp = max(avg_sim - avg_io - avg_mpio, 0)
+    #             else:
+    #                 avg_comp = avg_comm = avg_io = avg_mpio = 0
+    #             comp_v.append(avg_comp); comm_v.append(avg_comm)
+    #             io_v.append(avg_io);     mpio_v.append(avg_mpio)
 
-            segs    = [np.array(v) for v in [comp_v, comm_v, io_v, mpio_v]]
-            totals  = sum(segs)
-            bottoms = np.zeros(n_nodes)
+    #         segs    = [np.array(v) for v in [comp_v, comm_v, io_v, mpio_v]]
+    #         totals  = sum(segs)
+    #         bottoms = np.zeros(n_nodes)
 
-            for vals, color in zip(segs, seg_colors):
-                ax.bar(X + offset, vals, width, bottom=bottoms,
-                       color=color, edgecolor='black', hatch=hatch,
-                       label='_nolegend_')
-                bottoms += vals
+    #         for vals, color in zip(segs, seg_colors):
+    #             ax.bar(X + offset, vals, width, bottom=bottoms,
+    #                    color=color, edgecolor='black', hatch=hatch,
+    #                    label='_nolegend_')
+    #             bottoms += vals
 
-            # Total e rótulo do experimento no topo de cada barra
-            for i, (x, tot) in enumerate(zip(X + offset, totals)):
-                if tot > 0:
-                    ax.text(x, tot * 1.005, f'{label}\n{tot:.0f}s',
-                            ha='center', va='bottom', fontsize=7)
+    #         # Total e rótulo do experimento no topo de cada barra
+    #         for i, (x, tot) in enumerate(zip(X + offset, totals)):
+    #             if tot > 0:
+    #                 ax.text(x, tot * 1.005, f'{label}\n{tot:.0f}s',
+    #                         ha='center', va='bottom', fontsize=7)
 
-        # Legenda: cores = componentes, hachuras = experimentos
-        color_handles = [Patch(facecolor=c, edgecolor='black', label=l)
-                         for c, l in zip(seg_colors, seg_labels)]
-        hatch_handles = [Patch(facecolor='white', edgecolor='black',
-                               hatch=exp_hatches[j % len(exp_hatches)],
-                               label=lbl)
-                         for j, (_, lbl) in enumerate(experiments)]
-        ax.legend(handles=color_handles + hatch_handles,
-                  loc='upper right', fontsize=8, ncol=2)
+    #     # Legenda: cores = componentes, hachuras = experimentos
+    #     color_handles = [Patch(facecolor=c, edgecolor='black', label=l)
+    #                      for c, l in zip(seg_colors, seg_labels)]
+    #     hatch_handles = [Patch(facecolor='white', edgecolor='black',
+    #                            hatch=exp_hatches[j % len(exp_hatches)],
+    #                            label=lbl)
+    #                      for j, (_, lbl) in enumerate(experiments)]
+    #     ax.legend(handles=color_handles + hatch_handles,
+    #               loc='upper right', fontsize=8, ncol=2)
 
-        ax.set_xticks(X)
-        ax.set_xticklabels([f"{n} Nodes" for n in all_nodes])
-        ax.set_ylabel('Tempo médio por processo (s)')
-        ax.set_title(f'Comparação de Experimentos — {plotLabel}')
-        ax.grid(True, axis='y', linestyle='--', alpha=0.5)
-        plt.tight_layout()
-        plt.show()
+    #     ax.set_xticks(X)
+    #     ax.set_xticklabels([f"{n} Nodes" for n in all_nodes])
+    #     ax.set_ylabel('Tempo médio por processo (s)')
+    #     ax.set_title(f'Comparação de Experimentos — {plotLabel}')
+    #     ax.grid(True, axis='y', linestyle='--', alpha=0.5)
+    #     plt.tight_layout()
+    #     plt.show()
     
     def PlotHistogram(self,max_size_kb=0):
 
