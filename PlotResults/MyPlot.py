@@ -477,151 +477,138 @@ class MyPlot(object):
         """
         Stacked bar com alturas reais (s), barras lado a lado por experimento.
 
-        Parameters
-        ----------
         experiments : list of (csv_path, label)
-            Caminho direto para plot.csv e rótulo descritivo.
-            Exemplo:
-                [
-                    (r"...\\Sem rede\\plot.csv",       "Centralizado"),
-                    (r"...\\Sem rede - MPIO\\plot.csv", "MPI-IO"),
-                ]
-        plotLabel : str  — título do gráfico
+            Ex: [(r"...\\plot.csv", "Centralizado"), (r"...\\plot.csv", "MPI-IO")]
+        plotLabel   : título do gráfico
 
-        Cada grupo no eixo X representa uma contagem de nós.
-        Dentro do grupo há uma barra por experimento, lado a lado.
+        Segmentos grandes  → label centrado dentro da barra
+        Segmentos pequenos → label colorido numa zona acima das barras,
+                             sem setas nem linhas que cruzem barras vizinhas.
         """
-        seg_colors = ['#4caf50', '#1976d2', '#e57373', '#fbc02d']
-        seg_labels = ['Computação', 'Comunicação', 'E/S', 'Coletiva MPI']
-        exp_hatches = ['', '///', '...', 'xxx']
-        dark_text_colors = {'#1976d2'}   # segmentos com fundo escuro → texto branco
+        from matplotlib.patches import Patch
+
+        seg_colors      = ['#4caf50', '#1976d2', '#e57373', '#fbc02d']
+        seg_labels_txt  = ['Computação', 'Comunicação', 'E/S', 'Coletiva MPI']
+        exp_hatches     = ['', '///']
+        dark_bg         = {'#1976d2'}
 
         def _load(csv_path):
-            df = pd.read_csv(csv_path, index_col='Nodes')
+            df         = pd.read_csv(csv_path, index_col='Nodes')
             avg_sim    = df['Avg_Simulation'].values
             avg_io     = df['Avg_io_per_process'].values
-            avg_mpioCollective   = df['Avg_mpiCollective_per_process'].values
+            avg_coll   = df['Avg_mpiCollective_per_process'].values
             avg_comm   = df['Avg_comunication_per_process'].values
-            stdev_sim  = df['Stdev_simulation'].values
-            stdev_io   = df['Stdev_io_per_process'].values
-            stdev_comm = df['std_comunication_per_process'].values
-            stdev_mpioCollective = df['std_mpiCollective_per_process'].values
-            avg_comp   = np.maximum(avg_sim - avg_io - avg_mpioCollective, 0)
-            stdev_comp = np.sqrt(np.maximum(stdev_sim**2 - stdev_io**2 - stdev_mpioCollective**2, 0))
-            total      = avg_comp + avg_comm + avg_io + avg_mpioCollective
-            seg_v = [avg_comp, avg_comm, avg_io, avg_mpioCollective]
-            seg_s = [stdev_comp, stdev_comm, stdev_io, stdev_mpioCollective]
-            return df.index.tolist(), seg_v, seg_s, total
+            std_sim    = df['Stdev_simulation'].values
+            std_io     = df['Stdev_io_per_process'].values
+            std_comm   = df['std_comunication_per_process'].values
+            std_coll   = df['std_mpiCollective_per_process'].values
+            avg_comp   = np.maximum(avg_sim - avg_io - avg_coll, 0)
+            std_comp   = np.sqrt(np.maximum(std_sim**2 - std_io**2 - std_coll**2, 0))
+            total      = avg_comp + avg_comm + avg_io + avg_coll
+            return (df.index.tolist(),
+                    [avg_comp, avg_comm, avg_io, avg_coll],
+                    [std_comp, std_comm, std_io, std_coll],
+                    total)
 
-        # Carrega todos os CSVs e determina nós em comum (ordem do primeiro)
-        loaded = [_load(p) for p, _ in experiments]
-        all_nodes = loaded[0][0]   # preserva ordem do primeiro CSV
-        n_nodes   = len(all_nodes)
-        n_exp     = len(experiments)
-        width     = 0.75 / n_exp
-        gap       = 0.05           # espaço entre grupos
-        X         = np.arange(n_nodes) * (0.75 + gap + 0.1)
+        loaded     = [_load(p) for p, _ in experiments]
+        all_nodes  = loaded[0][0]
+        n_nodes    = len(all_nodes)
+        n_exp      = len(experiments)
+        bar_w      = 0.35
+        grp_gap    = 0.5                          # espaço entre grupos de nós
+        X          = np.arange(n_nodes) * (n_exp * bar_w + grp_gap)
 
-        # Limiar global para decidir label dentro vs seta
-        global_max = max(t.max() for _, _, _, t in loaded)
-        vis_threshold = global_max * 0.04
+        global_max    = max(float(t.max()) for _, _, _, t in loaded)
+        vis_threshold = global_max * 0.05         # abaixo disso → zona acima
 
-        # Máscara de legenda de segmento: só entra se algum experimento tem valor > 0
         legend_mask = [
             any(np.any(loaded[j][1][s] > 0) for j in range(n_exp))
-            for s in range(len(seg_labels))
+            for s in range(len(seg_labels_txt))
         ]
 
-        fig, ax = plt.subplots(figsize=(max(11, n_nodes * n_exp * 1.8), 7))
+        # Zona de labels acima das barras começa em global_max * zona_start
+        zona_start = 1.08
+        line_h     = global_max * 0.065
+
+        fig, ax = plt.subplots(figsize=(max(10, n_nodes * (n_exp * bar_w + grp_gap) * 2.2), 8))
         ax2 = ax.twinx()
 
-        # Coleta todos os bar_info para depois empilhar os labels acima das barras
-        # sem cruzamentos: cada barra tem sua própria fila de labels pequenos
-        all_small = {}   # (bar_x_val, i) -> lista de (y_base, label_txt, color)
+        # ── Desenha barras e coleta labels pequenos ──────────────────────────
+        small_labels = {}   # bar_x → [(txt, color), ...]
 
         for j, ((_, exp_label), (nodes, seg_v, seg_s, total)) in enumerate(
                 zip(experiments, loaded)):
-            hatch   = exp_hatches[j % len(exp_hatches)]
-            bar_off = (j - n_exp / 2 + 0.5) * width
-            bar_x   = X + bar_off
+            hatch  = exp_hatches[j % len(exp_hatches)]
+            bar_x  = X + (j - (n_exp - 1) / 2) * bar_w
+            bots   = np.zeros(n_nodes)
 
-            bottoms  = np.zeros(n_nodes)
-            bar_info = []
-
-            for s_idx, (vals, stds, color, slbl, in_leg) in enumerate(
-                    zip(seg_v, seg_s, seg_colors, seg_labels, legend_mask)):
-                legend_lbl = slbl if (in_leg and j == 0) else '_nolegend_'
-                ax.bar(bar_x, vals, width, bottom=bottoms,
-                       color=color, edgecolor='white', linewidth=0.6,
-                       hatch=hatch, label=legend_lbl,
+            for s, (vals, stds, color, slbl, ok) in enumerate(
+                    zip(seg_v, seg_s, seg_colors, seg_labels_txt, legend_mask)):
+                lbl = slbl if (ok and j == 0) else '_nolegend_'
+                ax.bar(bar_x, vals, bar_w, bottom=bots,
+                       color=color, edgecolor='white', linewidth=0.5,
+                       hatch=hatch, label=lbl,
                        yerr=stds, capsize=4,
-                       error_kw=dict(elinewidth=1.2, capthick=1.2, ecolor='#555'))
-                bar_info.append((vals, bottoms.copy()))
-                bottoms += vals
-
-            for s_idx, (vals, bot) in enumerate(bar_info):
-                color = seg_colors[s_idx]
+                       error_kw=dict(elinewidth=1.2, capthick=1.2, ecolor='#444'))
+                # Label dentro (segmento grande)
                 for i in range(n_nodes):
-                    if vals[i] == 0:
+                    if vals[i] <= 0:
                         continue
                     pct = vals[i] / total[i] * 100 if total[i] > 0 else 0
-                    label_txt = f'{pct:.1f}%\n{vals[i]:.1f}s'
-                    seg_cy = bot[i] + vals[i] / 2
-
+                    cy  = bots[i] + vals[i] / 2
                     if vals[i] >= vis_threshold:
-                        # Label dentro do segmento
-                        tc = 'white' if color in dark_text_colors else 'black'
-                        ax.text(bar_x[i], seg_cy, label_txt,
+                        tc = 'white' if color in dark_bg else 'black'
+                        ax.text(bar_x[i], cy, f'{pct:.1f}%\n{vals[i]:.1f}s',
                                 ha='center', va='center',
-                                fontsize=7, fontweight='bold', color=tc)
+                                fontsize=7.5, fontweight='bold', color=tc)
                     else:
-                        # Acumula para renderizar empilhado acima da barra
-                        key = (round(bar_x[i], 6), i)
-                        all_small.setdefault(key, {'total': total[i], 'items': []})
-                        all_small[key]['items'].append((label_txt, color))
+                        key = round(bar_x[i], 8)
+                        small_labels.setdefault(key, [])
+                        small_labels[key].append((f'{slbl}: {pct:.1f}% · {vals[i]:.1f}s', color))
+                bots += vals
 
-            # Rótulo do experimento + total no topo de cada barra
+            # Rótulo do experimento + total acima de cada barra
             for i, tot in enumerate(total):
-                ax.text(bar_x[i], tot + global_max * 0.005,
-                        f'{exp_label}  {tot:.0f}s',
-                        ha='center', va='bottom', fontsize=7,
-                        fontweight='bold', color='#222')
-
-        # Renderiza labels pequenos empilhados acima do topo, sem setas nem cruzamentos
-        line_h = global_max * 0.055   # altura de cada linha de texto
-        for key, data in all_small.items():
-            bx    = key[0]
-            y_cur = data['total'] + global_max * 0.09   # começa logo acima do rótulo do total
-            for label_txt, color in data['items']:
-                ax.text(bx, y_cur, label_txt,
+                ax.text(bar_x[i], tot + global_max * 0.01,
+                        f'{exp_label}\n{tot:.0f}s',
                         ha='center', va='bottom',
-                        fontsize=6.5, fontweight='bold', color=color,
-                        bbox=dict(boxstyle='round,pad=0.15', fc='white',
-                                  ec=color, lw=0.8, alpha=0.85))
-                y_cur += line_h * (label_txt.count('\n') + 1)
+                        fontsize=7, fontweight='bold', color='#111')
 
-        # Eixo direito espelhado
-        ax.set_ylim(0, global_max * 1.55)
-        ax2.set_ylim(0, 100 * 1.55)
+        # ── Zona de labels pequenos: empilhados acima de cada barra ──────────
+        for bx, items in small_labels.items():
+            y = global_max * zona_start
+            for txt, color in items:
+                ax.text(bx, y, txt,
+                        ha='center', va='bottom',
+                        fontsize=7, fontweight='bold', color=color)
+                y += line_h
+
+        # ── Eixos ─────────────────────────────────────────────────────────────
+        ylim_top = global_max * (zona_start + len(seg_labels_txt) * 0.08)
+        ax.set_ylim(0, ylim_top)
+        ax2.set_ylim(0, ylim_top / global_max * 100)
         ax2.yaxis.set_major_formatter(mticker.FuncFormatter(lambda v, _: f'{v:.0f}%'))
         ax2.set_ylabel('Proporção do tempo total (%)', color='#555')
         ax2.tick_params(axis='y', labelcolor='#555')
+
+        # Linha separando zona de labels do gráfico
+        ax.axhline(global_max * (zona_start - 0.02), color='#bbb',
+                   linewidth=0.8, linestyle='--')
 
         ax.set_xticks(X)
         ax.set_xticklabels([f'{nd} Nodes' for nd in all_nodes])
         ax.set_ylabel('Tempo médio por processo (s)')
         ax.set_title(f'Decomposição do Tempo de Execução — {plotLabel}', fontsize=12)
-        ax.grid(True, axis='y', linestyle='--', alpha=0.35)
+        ax.grid(True, axis='y', linestyle='--', alpha=0.3)
 
-        # Legenda: cores = segmentos + hachuras = experimentos
-        from matplotlib.patches import Patch
-        seg_handles = [Patch(facecolor=c, edgecolor='white', label=l)
-                       for c, l, m in zip(seg_colors, seg_labels, legend_mask) if m]
-        exp_handles = [Patch(facecolor='#ccc', edgecolor='black',
-                             hatch=exp_hatches[j % len(exp_hatches)], label=lbl)
-                       for j, (_, lbl) in enumerate(experiments)]
-        ax.legend(handles=seg_handles + exp_handles,
-                  loc='upper right', fontsize=8, framealpha=0.9, ncol=2)
+        # ── Legenda ───────────────────────────────────────────────────────────
+        seg_h = [Patch(facecolor=c, edgecolor='white', label=l)
+                 for c, l, m in zip(seg_colors, seg_labels_txt, legend_mask) if m]
+        exp_h = [Patch(facecolor='#ddd', edgecolor='#555',
+                       hatch=exp_hatches[j % len(exp_hatches)], label=lbl)
+                 for j, (_, lbl) in enumerate(experiments)]
+        ax.legend(handles=seg_h + exp_h,
+                  loc='upper left', fontsize=8, framealpha=0.9, ncol=2)
 
         plt.tight_layout()
         plt.show()
