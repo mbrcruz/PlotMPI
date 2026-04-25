@@ -295,10 +295,7 @@ class MyPlot(object):
             stdev_mpiCollective = sum_mpiCollective.groupby("experiment").mean().std()
               
         print(f'AVG MPIOpen (s): {avg_mpiCollective:.2f}')        
-        print(f'Stdev MPIOpen (s)): {stdev_mpiCollective:.2f}')        
-        
-        
-        
+        print(f'Stdev MPIOpen (s)): {stdev_mpiCollective:.2f}')  
         
         if not desabilitaEscreverCsv:
             print("Writing CSV file...")
