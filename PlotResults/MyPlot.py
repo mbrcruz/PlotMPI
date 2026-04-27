@@ -519,18 +519,19 @@ class MyPlot(object):
         Stacked bar com alturas reais (s), barras lado a lado por experimento.
 
         experiments : list of (csv_path, label)
-            Ex: [(r"...\\plot.csv", "Original"), (r"...\\plot.csv", "MPI-IO")]
+            Ex: [(r"...\\plot.csv", "Implementação atual"), (r"...\\plot.csv", "MPI-IO")]
         plotLabel   : título do gráfico
 
-        Segmentos grandes  → label centrado dentro da barra
-        Segmentos pequenos → label colorido numa zona acima das barras,
-                             sem setas nem linhas que cruzem barras vizinhas.
+        Segmentos grandes  (>= large_threshold) → 2 linhas dentro: % + segundos
+        Segmentos médios   (>= vis_threshold)   → 1 linha dentro: só %
+        Segmentos pequenos (< vis_threshold)    → zona colorida acima das barras
         """
         from matplotlib.patches import Patch
 
         seg_colors      = ['#4caf50', '#1976d2', '#e57373', '#fbc02d']
         seg_labels_txt  = ['Computação', 'Comunicação', 'E/S', 'Coletiva MPI']
         exp_hatches     = ['', '///']
+        exp_txt_colors  = ['#1a1a1a', '#c62828', '#1565c0', '#2e7d32']
         dark_bg         = {'#1976d2'}
 
         def _load(csv_path):
@@ -556,26 +557,33 @@ class MyPlot(object):
         n_nodes    = len(all_nodes)
         n_exp      = len(experiments)
         bar_w      = 0.35
-        grp_gap    = 0.5                          # espaço entre grupos de nós
+        grp_gap    = 0.5
         X          = np.arange(n_nodes) * (n_exp * bar_w + grp_gap)
 
-        global_max    = max(float(t.max()) for _, _, _, t in loaded)
-        vis_threshold = global_max * 0.05         # abaixo disso → zona acima
+        global_max      = max(float(t.max()) for _, _, _, t in loaded)
+        large_threshold = global_max * 0.14   # 2 linhas: % + segundos
+        vis_threshold   = global_max * 0.05   # 1 linha: só %; abaixo → zona acima
 
         legend_mask = [
             any(np.any(loaded[j][1][s] > 0) for j in range(n_exp))
             for s in range(len(seg_labels_txt))
         ]
 
-        # Zona de labels acima das barras começa em global_max * zona_start
-        zona_start = 1.08
-        line_h     = global_max * 0.065
+        # Máximo total por grupo de nós — baseline para a zona de labels
+        group_max = np.zeros(n_nodes)
+        for _, _, _, total in loaded:
+            group_max = np.maximum(group_max, total)
+
+        line_h    = global_max * 0.06
+        clearance = global_max * 0.08
 
         fig, ax = plt.subplots(figsize=(max(10, n_nodes * (n_exp * bar_w + grp_gap) * 2.2), 8))
         ax2 = ax.twinx()
 
-        # ── Desenha barras e coleta labels pequenos ──────────────────────────
-        small_labels = {}   # bar_x → [(txt, color), ...]
+        # small_labels : bar_x → {'gi': group_index, 'items': [(txt, color)]}
+        # totals_list  : [(bar_x_array, total_array, j)] — renderizados por último
+        small_labels = {}
+        totals_list  = []
 
         for j, ((_, exp_label), (nodes, seg_v, seg_s, total)) in enumerate(
                 zip(experiments, loaded)):
@@ -591,50 +599,69 @@ class MyPlot(object):
                        hatch=hatch, label=lbl,
                        yerr=stds, capsize=4,
                        error_kw=dict(elinewidth=1.2, capthick=1.2, ecolor='#444'))
-                # Label dentro (segmento grande)
+
                 for i in range(n_nodes):
                     if vals[i] <= 0:
                         continue
                     pct = vals[i] / total[i] * 100 if total[i] > 0 else 0
                     cy  = bots[i] + vals[i] / 2
-                    if vals[i] >= vis_threshold:
+                    if vals[i] >= large_threshold:
                         tc = 'white' if color in dark_bg else 'black'
-                        ax.text(bar_x[i], cy, f'{pct:.1f}%\n{vals[i]:.1f}s',
+                        ax.text(bar_x[i], cy, f'{pct:.1f}%\n{vals[i]:.0f}s',
                                 ha='center', va='center',
                                 fontsize=7.5, fontweight='bold', color=tc)
+                    elif vals[i] >= vis_threshold:
+                        tc = 'white' if color in dark_bg else 'black'
+                        ax.text(bar_x[i], cy, f'{pct:.1f}%',
+                                ha='center', va='center',
+                                fontsize=7, fontweight='bold', color=tc)
                     else:
                         key = round(bar_x[i], 8)
-                        small_labels.setdefault(key, [])
-                        small_labels[key].append((f'{slbl}: {pct:.1f}% · {vals[i]:.1f}s', color))
+                        if key not in small_labels:
+                            small_labels[key] = {'gi': i, 'items': []}
+                        small_labels[key]['items'].append(
+                            (f'{pct:.1f}% · {vals[i]:.0f}s', color))
                 bots += vals
 
-            # Rótulo do experimento + total acima de cada barra
-            for i, tot in enumerate(total):
-                ax.text(bar_x[i], tot + global_max * 0.01,
-                        f'{exp_label}\n{tot:.0f}s',
-                        ha='center', va='bottom',
-                        fontsize=7, fontweight='bold', color='#111')
+            totals_list.append((bar_x.copy(), total.copy(), j))
 
-        # ── Zona de labels pequenos: empilhados acima de cada barra ──────────
-        for bx, items in small_labels.items():
-            y = global_max * zona_start
-            for txt, color in items:
+        # ── Passo 2: zona de labels pequenos, rastreando topo por grupo ───────
+        # group_top[i] = próxima y disponível para o grupo i após small_labels
+        group_top = group_max + clearance   # ponto de partida de cada grupo
+
+        for bx, data in small_labels.items():
+            gi = data['gi']
+            y  = group_max[gi] + clearance
+            for txt, color in data['items']:
                 ax.text(bx, y, txt,
                         ha='center', va='bottom',
                         fontsize=7, fontweight='bold', color=color)
                 y += line_h
+            if y > group_top[gi]:
+                group_top[gi] = y
+
+        # ── Passo 3: labels de total acima da zona de small_labels ────────────
+        # Empilhados por experimento dentro de cada grupo, sem colidir com nada.
+        for bar_x, total, j in totals_list:
+            tc_exp = exp_txt_colors[j % len(exp_txt_colors)]
+            for i, tot in enumerate(total):
+                y = group_top[i] + j * line_h * 0.85
+                ax.text(bar_x[i], y, f'{tot:.0f}s',
+                        ha='center', va='bottom',
+                        fontsize=7.5, fontweight='bold', color=tc_exp)
+
+        max_label_top = max(
+            group_top[i] + n_exp * line_h * 0.85
+            for i in range(n_nodes)
+        )
 
         # ── Eixos ─────────────────────────────────────────────────────────────
-        ylim_top = global_max * (zona_start + len(seg_labels_txt) * 0.08)
+        ylim_top = max(global_max * 1.4, max_label_top + line_h)
         ax.set_ylim(0, ylim_top)
         ax2.set_ylim(0, ylim_top / global_max * 100)
         ax2.yaxis.set_major_formatter(mticker.FuncFormatter(lambda v, _: f'{v:.0f}%'))
         ax2.set_ylabel('Proporção do tempo total (%)', color='#555')
         ax2.tick_params(axis='y', labelcolor='#555')
-
-        # Linha separando zona de labels do gráfico
-        ax.axhline(global_max * (zona_start - 0.02), color='#bbb',
-                   linewidth=0.8, linestyle='--')
 
         ax.set_xticks(X)
         ax.set_xticklabels([f'{nd} Nodes' for nd in all_nodes])
