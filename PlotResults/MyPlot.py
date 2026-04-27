@@ -132,14 +132,22 @@ class MyPlot(object):
                     simulation["comunication"] = simulation["simulation"] - simulation["hourly_simulation"]
                     self.Simulations.append(simulation)
 
-                    # load mpi comunication times if exist
-                    if os.path.exists(os.path.join(self.base_directory , str(experiment+1), f"mpiio-collective-{rank}.log")):
-                        self.df_mpiCollective= pd.read_csv(os.path.join(self.base_directory , str(experiment+1), f"mpiio-collective-{rank}.log"),header=None)
+                    # load mpi collective times — tenta os dois padrões de nome
+                    _exp_dir = os.path.join(self.base_directory, str(experiment+1))
+                    _collective_path = os.path.join(_exp_dir, f"mpiio-collective-{rank}.log")
+                    _open_path       = os.path.join(_exp_dir, f"mpiio-open-{rank}.log")
+                    if os.path.exists(_collective_path):
+                        # colunas: [..., col3=start, col4=end]
+                        self.df_mpiCollective = pd.read_csv(_collective_path, header=None)
                         for k in range(len(self.df_mpiCollective)):
-                            mpiCollectiveDiff= self.df_mpiCollective.iloc[k,4] - self.df_mpiCollective.iloc[k,3]
-                            mpiCollectiveTimeRecord={}
-                            mpiCollectiveTimeRecord= { "experiment": experiment+1, 'timeSec': mpiCollectiveDiff , "rank": rank }  
-                            self.mpiCollective.append(mpiCollectiveTimeRecord)  
+                            diff = self.df_mpiCollective.iloc[k,7] - self.df_mpiCollective.iloc[k, 6]
+                            self.mpiCollective.append({"experiment": experiment+1, "timeSec": diff, "rank": rank})
+                    elif os.path.exists(_open_path):
+                        # colunas: [0, 1, open_time, close_time]
+                        self.df_mpiCollective = pd.read_csv(_open_path, header=None)
+                        for k in range(len(self.df_mpiCollective)):
+                            diff = self.df_mpiCollective.iloc[k, 3] - self.df_mpiCollective.iloc[k, 2]
+                            self.mpiCollective.append({"experiment": experiment+1, "timeSec": diff, "rank": rank})
 
         print(f'Number of Records: {len(self.records)}')             
 
