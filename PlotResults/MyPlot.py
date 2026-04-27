@@ -348,46 +348,53 @@ class MyPlot(object):
             writer.writerow(linha)
             arquivo_csv.close()      
             
-    def plotBandwidth(self,base_directory,plotLabel):
-        
-        # if self.records is None or len(self.records) == 0:
-        #     self.load_data(number_experiments=1)
-            
-        # df = pd.DataFrame(self.records)
+    def plotBandwidth(self, experiments, plotLabel):
+        """
+        Banda agregada por configuração de nós, comparando múltiplos experimentos.
 
-        # # calcula tamanho médio por cenário (GB)
-        # agrupados = df.groupby("scenario")[["sizeBytes"]].sum()
-        # size_por_scenario = agrupados["sizeBytes"].mean() / 1e9
+        experiments : list of (csv_path, label)
+            Ex: [(r"...\\plot.csv", "Original"), (r"...\\plot.csv", "MPI-IO")]
+        """
+        exp_colors  = ['#1976d2', '#e53935', '#43a047', '#fb8c00', '#8e24aa']
+        exp_hatches = ['', '///', '...', 'xxx']
 
-        # carrega CSV com métricas por configuração
-        df_csv = pd.read_csv(os.path.join(base_directory, "../plot.csv"), index_col='Nodes')
-        df_len = len(df_csv)
-        X = np.arange(df_len)
-        categorias = [f"{n} Nodes" for n in df_csv.index]        
-        avgBandwidth = df_csv['Avg_bandwidth'].to_numpy()
-        #avgBandwidth = avgBandwidthCenario
-        stdDevBandwidthScenario = df_csv['Stddev_bandwidth'].to_numpy()
-        stdDevBandwidth = stdDevBandwidthScenario
+        # Carrega todos os CSVs
+        dfs = [(pd.read_csv(p, index_col='Nodes'), lbl) for p, lbl in experiments]
+        all_nodes = dfs[0][0].index.tolist()
+        n_nodes   = len(all_nodes)
+        n_exp     = len(experiments)
+        bar_w     = 0.7 / n_exp
+        X         = np.arange(n_nodes)
 
-        # calcula volume de dados por nó (GB) para segunda eixo y
-        # sizePerNode = np.zeros(df_len)
-        # for i in range(df_len):
-        #     total_size_per_nodes = (size_por_scenario * self.number_scenarios) / 2 ** ( i+1)
-        #     sizePerNode[i] = total_size_per_nodes
+        fig, ax = plt.subplots(figsize=(max(8, n_nodes * n_exp * 1.2), 5))
 
-        # plot com dois eixos y
-        fig, ax1 = plt.subplots(figsize=(8, 5))
-        ax1.bar(X, avgBandwidth, yerr=stdDevBandwidth, capsize=8, color='blue', edgecolor='black', label='Banda (Gb/s)')
-        ax1.set_ylabel('Banda agregada média (Gb/s)', color='green')
-        ax1.set_xlabel('Configuração')
-        ax1.set_xticks(X)
-        ax1.set_xticklabels(categorias)
-        ax1.grid(True, axis='y', linestyle='--', alpha=0.5)
-        ax1.set_ylim(bottom=0)
+        for j, (df, lbl) in enumerate(dfs):
+            color   = exp_colors[j % len(exp_colors)]
+            hatch   = exp_hatches[j % len(exp_hatches)]
+            bar_x   = X + (j - (n_exp - 1) / 2) * bar_w
+            avg_bw  = df['Avg_bandwidth'].values
+            std_bw  = df['Stddev_bandwidth'].values
+            ax.bar(bar_x, avg_bw, bar_w,
+                   yerr=std_bw, capsize=6,
+                   color=color, edgecolor='white', hatch=hatch,
+                   label=lbl,
+                   error_kw=dict(elinewidth=1.5, capthick=1.5, ecolor='#333'))
+            # Valor no topo de cada barra
+            for i, (bx, v) in enumerate(zip(bar_x, avg_bw)):
+                ax.text(bx, v + std_bw[i] + ax.get_ylim()[1] * 0.01,
+                        f'{v:.1f}', ha='center', va='bottom',
+                        fontsize=7.5, fontweight='bold', color=color)
 
+        ax.set_xticks(X)
+        ax.set_xticklabels([f'{n} Nodes' for n in all_nodes])
+        ax.set_ylabel('Banda agregada média (Gb/s)')
+        ax.set_xlabel('Configuração')
+        ax.set_title(f'Banda Agregada — {plotLabel}', fontsize=12)
+        ax.set_ylim(bottom=0)
+        ax.grid(True, axis='y', linestyle='--', alpha=0.5)
+        ax.legend(fontsize=9, framealpha=0.9)
         plt.tight_layout()
         plt.show()
-        return        
 
     def plotScenarios(self,base_directory,plotLabel):
         
@@ -417,64 +424,93 @@ class MyPlot(object):
         plt.show()
 
     
-    def plotBlocks(self,base_directory,plotLabel,number_blocks=4):
-        
-        df_csv = pd.read_csv(os.path.join(base_directory,"plot.csv"),index_col='Nodes')
-        number_conf = len(df_csv)
-        categorias =  np.empty(number_conf, dtype=object)       
-        xTicks = np.zeros(number_conf)      
-       
+    def plotBlocks(self, experiments, plotLabel, number_blocks=4):
+        """
+        Tempo médio por categoria de tamanho de mensagem, comparando experimentos.
 
-        X= np.zeros((number_blocks,number_conf))
-        avgLatency = np.zeros((number_blocks,number_conf))
-        stdLatency = np.zeros((number_blocks,number_conf))
+        experiments : list of (csv_path, label)
+            Ex: [(r"...\\plot.csv", "Original"), (r"...\\plot.csv", "MPI-IO")]
 
-        # Plotando com barras de erro vindas da outra série
-        space_between=5
-        for i in range(0,number_conf):     
-            xTicks[i]= i*space_between
-            categorias[i]= f"{df_csv.index[i]} Nodes"       
-            X[0][i] = i*space_between
-            X[1][i] = i*space_between+1
-            X[2][i] = i*space_between+2
-            X[3][i] = i*space_between+3 
-            avgLatency[0][i] = df_csv.iloc[i]['Avg_time_per_record1']
-            stdLatency[0][i] = df_csv.iloc[i]['Stdev_time_per_record1']    
-            avgLatency[1][i] = df_csv.iloc[i]['Avg_time_per_record2']
-            stdLatency[1][i] = df_csv.iloc[i]['Stdev_time_per_record2']
-            avgLatency[2][i] = df_csv.iloc[i]['Avg_time_per_record3']
-            stdLatency[2][i] = df_csv.iloc[i]['Stdev_time_per_record3']
-            avgLatency[3][i] = df_csv.iloc[i]['Avg_time_per_record4']
-            stdLatency[3][i] = df_csv.iloc[i]['Stdev_time_per_record4'] 
-           
+        Organização do eixo X:
+            Grupos = contagem de nós.
+            Dentro de cada grupo: sub-grupos por categoria de tamanho,
+            dentro de cada sub-grupo: uma barra por experimento.
+        """
+        block_colors  = ['#bdbdbd', '#4caf50', '#29b6f6', '#e53935']
+        block_labels  = [
+            f'até {self.categories[0]*1000:.0f} KB',
+            f'até {self.categories[1]*1000:.0f} KB',
+            f'até {self.categories[2]*1000:.0f} MB',
+            f'até {self.categories[3]:.0f} MB',
+        ]
+        block_cols    = [
+            ('Avg_time_per_record1', 'Stdev_time_per_record1'),
+            ('Avg_time_per_record2', 'Stdev_time_per_record2'),
+            ('Avg_time_per_record3', 'Stdev_time_per_record3'),
+            ('Avg_time_per_record4', 'Stdev_time_per_record4'),
+        ]
+        exp_hatches = ['', '///']
 
+        dfs       = [(pd.read_csv(p, index_col='Nodes'), lbl) for p, lbl in experiments]
+        all_nodes = dfs[0][0].index.tolist()
+        n_nodes   = len(all_nodes)
+        n_exp     = len(experiments)
 
-        plt.figure(figsize=(8,5))
-        for i in range(0,number_blocks):
-            if i == 0:
-                color='lightyellow'
-                label=f"Messagem de até 1 KB" 
-            elif i == 1:
-                color='lightgreen'
-                label=f"Messagem de até 128 KB" 
-            elif i == 2:
-                color='deepskyblue' 
-                label=f"Messagem de até {self.categories[2]} MB" 
-            else:
-                color='darkred' 
-                label=f"Messagem de até {self.categories[3]} MB" 
-                     
-            plt.bar(X[i], avgLatency[i], yerr=stdLatency[i], label=label, width=0.9,capsize=8, color=color, edgecolor='black') 
+        bar_w       = 0.18                   # largura de cada barra individual
+        blk_gap     = 0.05                   # espaço entre categorias de tamanho
+        grp_gap     = 0.6                    # espaço entre grupos de nós
+        blk_span    = n_exp * bar_w + blk_gap
+        grp_span    = number_blocks * blk_span + grp_gap
 
-       
-        plt.yscale("log")
-        plt.xticks(xTicks, categorias)
-        plt.ylabel('Tempo médio(s) do envio em escala logaritmica')
-        plt.grid(True, axis='y', linestyle='--', alpha=0.5)
+        # Centro de cada grupo de nós
+        grp_centers = np.arange(n_nodes) * grp_span
 
-        plt.legend(loc='lower center', bbox_to_anchor=(0.5, 1.02), ncol=2)
+        fig, ax = plt.subplots(figsize=(max(10, n_nodes * number_blocks * n_exp * 0.55), 6))
+
+        # Ticks no centro de cada grupo
+        xtick_pos    = []
+        xtick_labels = []
+
+        for ni, node in enumerate(all_nodes):
+            grp_x = grp_centers[ni]
+            xtick_pos.append(grp_x + (number_blocks * blk_span) / 2 - blk_span / 2)
+            xtick_labels.append(f'{node} Nodes')
+
+            for bi in range(number_blocks):
+                blk_x = grp_x + bi * blk_span
+                avg_col, std_col = block_cols[bi]
+                color = block_colors[bi]
+
+                for j, (df, _) in enumerate(dfs):
+                    hatch  = exp_hatches[j % len(exp_hatches)]
+                    bar_x  = blk_x + (j - (n_exp - 1) / 2) * bar_w
+                    avg_v  = df.loc[node, avg_col] if node in df.index else 0
+                    std_v  = df.loc[node, std_col] if node in df.index else 0
+                    # Entra na legenda só na primeira ocorrência
+                    blk_lbl = block_labels[bi] if ni == 0 and j == 0 else '_nolegend_'
+                    ax.bar(bar_x, avg_v, bar_w,
+                           yerr=std_v, capsize=4,
+                           color=color, edgecolor='white', hatch=hatch,
+                           label=blk_lbl,
+                           error_kw=dict(elinewidth=1.2, capthick=1.2, ecolor='#444'))
+
+        # Legenda de categorias (cores) + experimentos (hachuras)
+        from matplotlib.patches import Patch
+        cat_h = [Patch(facecolor=c, edgecolor='white', label=l)
+                 for c, l in zip(block_colors, block_labels)]
+        exp_h = [Patch(facecolor='#ddd', edgecolor='#555',
+                       hatch=exp_hatches[j % len(exp_hatches)], label=lbl)
+                 for j, (_, lbl) in enumerate(experiments)]
+        ax.legend(handles=cat_h + exp_h,
+                  loc='upper right', fontsize=8, framealpha=0.9, ncol=2)
+
+        ax.set_yscale('log')
+        ax.set_xticks(xtick_pos)
+        ax.set_xticklabels(xtick_labels)
+        ax.set_ylabel('Tempo médio de envio (s) — escala logarítmica')
+        ax.set_title(f'Tempo por Categoria de Mensagem — {plotLabel}', fontsize=12)
+        ax.grid(True, axis='y', linestyle='--', alpha=0.4)
         plt.tight_layout()
-
         plt.show()
 
 
@@ -483,7 +519,7 @@ class MyPlot(object):
         Stacked bar com alturas reais (s), barras lado a lado por experimento.
 
         experiments : list of (csv_path, label)
-            Ex: [(r"...\\plot.csv", "Centralizado"), (r"...\\plot.csv", "MPI-IO")]
+            Ex: [(r"...\\plot.csv", "Original"), (r"...\\plot.csv", "MPI-IO")]
         plotLabel   : título do gráfico
 
         Segmentos grandes  → label centrado dentro da barra
@@ -632,7 +668,7 @@ class MyPlot(object):
     #     Exemplo de uso
     #     --------------
     #     p.plotExecutionTimeComparison([
-    #         (r"...\\AWS\\Lustre - 1024 Series - Sem rede\\plot.csv",       "Centralizado"),
+    #         (r"...\\AWS\\Lustre - 1024 Series - Sem rede\\plot.csv",       "Original"),
     #         (r"...\\AWS\\Lustre - 1024 Series - Sem rede - MPIO\\plot.csv", "MPIO"),
     #         (r"...\\AWS\\Lustre - 1024 Series - Sem rede - MPIO ASYNC\\plot.csv", "MPIO Async"),
     #     ], "AWS")
