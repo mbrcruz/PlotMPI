@@ -389,7 +389,6 @@ class MyPlot(object):
         ax.set_xticklabels([f'{n} Nodes' for n in all_nodes])
         ax.set_ylabel('Banda agregada média (Gb/s)')
         ax.set_xlabel('Configuração')
-        ax.set_title(f'Banda Agregada — {plotLabel}', fontsize=12)
         ax.set_ylim(bottom=0)
         ax.grid(True, axis='y', linestyle='--', alpha=0.5)
         ax.legend(fontsize=9, framealpha=0.9)
@@ -508,7 +507,6 @@ class MyPlot(object):
         ax.set_xticks(xtick_pos)
         ax.set_xticklabels(xtick_labels)
         ax.set_ylabel('Tempo médio de envio (s) — escala logarítmica')
-        ax.set_title(f'Tempo por Categoria de Mensagem — {plotLabel}', fontsize=12)
         ax.grid(True, axis='y', linestyle='--', alpha=0.4)
         plt.tight_layout()
         plt.show()
@@ -534,16 +532,25 @@ class MyPlot(object):
         exp_txt_colors  = ['#1a1a1a', '#c62828', '#1565c0', '#2e7d32']
         dark_bg         = {'#1976d2'}
 
+        def _col(df, *names):
+            """Retorna df[name] para o primeiro nome encontrado nas colunas."""
+            for name in names:
+                if name in df.columns:
+                    return df[name].values
+            raise KeyError(f'Nenhuma das colunas encontrada: {names}')
+
         def _load(csv_path):
             df         = pd.read_csv(csv_path, index_col='Nodes')
-            avg_sim    = df['Avg_Simulation'].values
-            avg_io     = df['Avg_io_per_process'].values
-            avg_coll   = df['Avg_mpiCollective_per_process'].values
-            avg_comm   = df['Avg_comunication_per_process'].values
-            std_sim    = df['Stdev_simulation'].values
-            std_io     = df['Stdev_io_per_process'].values
-            std_comm   = df['std_comunication_per_process'].values
-            std_coll   = df['std_mpiCollective_per_process'].values
+            avg_sim    = _col(df, 'Avg_Simulation')
+            avg_io     = _col(df, 'Avg_io_per_process')
+            avg_coll   = _col(df, 'Avg_mpiCollective_per_process',
+                                   'Avg_mpiopen_per_process')
+            avg_comm   = _col(df, 'Avg_comunication_per_process')
+            std_sim    = _col(df, 'Stdev_simulation')
+            std_io     = _col(df, 'Stdev_io_per_process')
+            std_comm   = _col(df, 'std_comunication_per_process')
+            std_coll   = _col(df, 'std_mpiCollective_per_process',
+                                   'std_mpiopen_per_process')
             avg_comp   = np.maximum(avg_sim - avg_io - avg_coll, 0)
             std_comp   = np.sqrt(np.maximum(std_sim**2 - std_io**2 - std_coll**2, 0))
             total      = avg_comp + avg_comm + avg_io + avg_coll
@@ -666,7 +673,6 @@ class MyPlot(object):
         ax.set_xticks(X)
         ax.set_xticklabels([f'{nd} Nodes' for nd in all_nodes])
         ax.set_ylabel('Tempo médio por processo (s)')
-        ax.set_title(f'Decomposição do Tempo de Execução — {plotLabel}', fontsize=12)
         ax.grid(True, axis='y', linestyle='--', alpha=0.3)
 
         # ── Legenda ───────────────────────────────────────────────────────────
