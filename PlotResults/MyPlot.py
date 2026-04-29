@@ -64,7 +64,7 @@ class MyPlot(object):
             self.colors[k]='#{:06x}'.format(random.randint(0, 0xFFFFFF))            
         return self.colors[k]
 
-    def load_data(self,filter_scenario=0,filter_experiment=0,number_experiments=10,min_size=0,max_size=0):
+    def load_data(self,filter_scenario=0,filter_experiment=0,number_experiments=5,min_size=0,max_size=0):
 
         if ( not self.typeEvaluation == TypeEvaluation.JUST_COMUNICATION 
             and not self.typeEvaluation == TypeEvaluation.COMUNICATION_AND_IO        
@@ -544,7 +544,7 @@ class MyPlot(object):
             avg_sim    = _col(df, 'Avg_Simulation')
             avg_io     = _col(df, 'Avg_io_per_process')
             avg_coll   = _col(df, 'Avg_mpiCollective_per_process',
-                                   'Avg_mpiopen_per_process')
+                                   'Avg_mpiopen_per_process') * 2
             avg_comm   = _col(df, 'Avg_comunication_per_process')
             std_sim    = _col(df, 'Stdev_simulation')
             std_io     = _col(df, 'Stdev_io_per_process')
@@ -567,9 +567,12 @@ class MyPlot(object):
         grp_gap    = 0.5
         X          = np.arange(n_nodes) * (n_exp * bar_w + grp_gap)
 
-        global_max      = max(float(t.max()) for _, _, _, t in loaded)
-        large_threshold = global_max * 0.14   # 2 linhas: % + segundos
-        vis_threshold   = global_max * 0.05   # 1 linha: só %; abaixo → zona acima
+        global_max    = max(float(t.max()) for _, _, _, t in loaded)
+        # Thresholds baseados no percentual da própria barra (pct),
+        # não no valor absoluto — assim segmentos grandes em barras curtas
+        # (ex: 32 nodes) também recebem o label completo.
+        PCT_LARGE = 12.0   # pct >= 12% → 2 linhas: % + segundos
+        PCT_VIS   =  4.0   # pct >=  4% → 1 linha: só %; abaixo → zona acima
 
         legend_mask = [
             any(np.any(loaded[j][1][s] > 0) for j in range(n_exp))
@@ -612,12 +615,14 @@ class MyPlot(object):
                         continue
                     pct = vals[i] / total[i] * 100 if total[i] > 0 else 0
                     cy  = bots[i] + vals[i] / 2
-                    if vals[i] >= large_threshold:
+                    if pct >= PCT_LARGE:
+                        # Segmento grande: % e segundos em 2 linhas
                         tc = 'white' if color in dark_bg else 'black'
                         ax.text(bar_x[i], cy, f'{pct:.1f}%\n{vals[i]:.0f}s',
                                 ha='center', va='center',
                                 fontsize=7.5, fontweight='bold', color=tc)
-                    elif vals[i] >= vis_threshold:
+                    elif pct >= PCT_VIS:
+                        # Segmento médio: só % em 1 linha compacta
                         tc = 'white' if color in dark_bg else 'black'
                         ax.text(bar_x[i], cy, f'{pct:.1f}%',
                                 ha='center', va='center',
