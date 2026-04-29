@@ -520,9 +520,8 @@ class MyPlot(object):
             Ex: [(r"...\\plot.csv", "Implementação atual"), (r"...\\plot.csv", "MPI-IO")]
         plotLabel   : título do gráfico
 
-        Segmentos grandes  (>= large_threshold) → 2 linhas dentro: % + segundos
-        Segmentos médios   (>= vis_threshold)   → 1 linha dentro: só %
-        Segmentos pequenos (< vis_threshold)    → zona colorida acima das barras
+        Segmentos grandes  (>= large_threshold) → tempo dentro da pilha
+        Percentuais de todos os segmentos       → zona acima das barras
         """
         from matplotlib.patches import Patch
 
@@ -531,6 +530,9 @@ class MyPlot(object):
         exp_hatches     = ['', '///']
         exp_txt_colors  = ['#1a1a1a', '#c62828', '#1565c0', '#2e7d32']
         dark_bg         = {'#1976d2'}
+        label_box       = dict(boxstyle='round,pad=0.18',
+                               facecolor='white', edgecolor='none',
+                               alpha=0.92)
 
         def _col(df, *names):
             """Retorna df[name] para o primeiro nome encontrado nas colunas."""
@@ -552,7 +554,7 @@ class MyPlot(object):
             std_coll   = _col(df, 'std_mpiCollective_per_process',
                                    'std_mpiopen_per_process')
             avg_comp   = np.maximum(avg_sim - avg_io - avg_coll, 0)
-            std_comp   = np.sqrt(np.maximum(std_sim**2 - std_io**2 - std_coll**2, 0))
+            std_comp   = np.sqrt(np.maximum(std_sim**2 + std_io**2 + std_coll**2, 0))
             total      = avg_comp + avg_comm + avg_io + avg_coll
             return (df.index.tolist(),
                     [avg_comp, avg_comm, avg_io, avg_coll],
@@ -571,8 +573,7 @@ class MyPlot(object):
         # Thresholds baseados no percentual da própria barra (pct),
         # não no valor absoluto — assim segmentos grandes em barras curtas
         # (ex: 32 nodes) também recebem o label completo.
-        PCT_LARGE = 12.0   # pct >= 12% → 2 linhas: % + segundos
-        PCT_VIS   =  4.0   # pct >=  4% → 1 linha: só %; abaixo → zona acima
+        PCT_LARGE = 12.0   # pct >= 12% → tempo dentro da pilha
 
         legend_mask = [
             any(np.any(loaded[j][1][s] > 0) for j in range(n_exp))
@@ -587,12 +588,12 @@ class MyPlot(object):
         line_h    = global_max * 0.06
         clearance = global_max * 0.08
 
-        fig, ax = plt.subplots(figsize=(max(10, n_nodes * (n_exp * bar_w + grp_gap) * 2.2), 8))
+        fig, ax = plt.subplots(figsize=(max(10, n_nodes * (n_exp * bar_w + grp_gap) * 2.2), 9.5))
         ax2 = ax.twinx()
 
-        # small_labels : bar_x → {'gi': group_index, 'items': [(txt, color)]}
+        # pct_labels   : bar_x → {'gi': group_index, 'items': [(txt, color)]}
         # totals_list  : [(bar_x_array, total_array, j)] — renderizados por último
-        small_labels = {}
+        pct_labels   = {}
         totals_list  = []
 
         for j, ((_, exp_label), (nodes, seg_v, seg_s, total)) in enumerate(
@@ -606,53 +607,59 @@ class MyPlot(object):
                 lbl = slbl if (ok and j == 0) else '_nolegend_'
                 ax.bar(bar_x, vals, bar_w, bottom=bots,
                        color=color, edgecolor='white', linewidth=0.5,
-                       hatch=hatch, label=lbl,
-                       yerr=stds, capsize=4,
-                       error_kw=dict(elinewidth=1.2, capthick=1.2, ecolor='#444'))
+                       hatch=hatch, label=lbl)
 
                 for i in range(n_nodes):
                     if vals[i] <= 0:
                         continue
                     pct = vals[i] / total[i] * 100 if total[i] > 0 else 0
                     cy  = bots[i] + vals[i] / 2
+                    std = max(float(stds[i]), 0.0)
+                    if std > 0:
+                        # Draw segment std above its own box, offset from the
+                        # centered time label.
+                        seg_yerr = min(std, float(vals[i]) * 0.45)
+                        err_x = bar_x[i] + bar_w * 0.30
+                        err_y = bots[i] + vals[i]
+                        ax.errorbar(err_x, err_y,
+                                    yerr=np.array([[0.0], [seg_yerr]]),
+                                    fmt='none', ecolor='#444',
+                                    elinewidth=1.2, capthick=1.2,
+                                    capsize=3, zorder=9, clip_on=True)
+                    key = round(bar_x[i], 8)
+                    if key not in pct_labels:
+                        pct_labels[key] = {'gi': i, 'items': []}
+                    pct_labels[key]['items'].append((f'{pct:.1f}%', color))
+
                     if pct >= PCT_LARGE:
-                        # Segmento grande: % e segundos em 2 linhas
+                        # Segmento grande: apenas o tempo dentro da pilha.
                         tc = 'white' if color in dark_bg else 'black'
-                        ax.text(bar_x[i], cy, f'{pct:.1f}%\n{vals[i]:.0f}s',
+                        ax.text(bar_x[i], cy, f'{vals[i]:.0f}s',
                                 ha='center', va='center',
-                                fontsize=7.5, fontweight='bold', color=tc)
-                    elif pct >= PCT_VIS:
-                        # Segmento médio: só % em 1 linha compacta
-                        tc = 'white' if color in dark_bg else 'black'
-                        ax.text(bar_x[i], cy, f'{pct:.1f}%',
-                                ha='center', va='center',
-                                fontsize=7, fontweight='bold', color=tc)
-                    else:
-                        key = round(bar_x[i], 8)
-                        if key not in small_labels:
-                            small_labels[key] = {'gi': i, 'items': []}
-                        small_labels[key]['items'].append(
-                            (f'{pct:.1f}% · {vals[i]:.0f}s', color))
+                                fontsize=8.5, fontweight='bold', color=tc,
+                                clip_on=True, zorder=10)
                 bots += vals
 
             totals_list.append((bar_x.copy(), total.copy(), j))
 
-        # ── Passo 2: zona de labels pequenos, rastreando topo por grupo ───────
-        # group_top[i] = próxima y disponível para o grupo i após small_labels
+        # ── Passo 2: zona de percentuais, rastreando topo por grupo ───────────
+        # group_top[i] = próxima y disponível para o grupo i após pct_labels
         group_top = group_max + clearance   # ponto de partida de cada grupo
 
-        for bx, data in small_labels.items():
+        for bx, data in pct_labels.items():
             gi = data['gi']
             y  = group_max[gi] + clearance
             for txt, color in data['items']:
                 ax.text(bx, y, txt,
                         ha='center', va='bottom',
-                        fontsize=7, fontweight='bold', color=color)
-                y += line_h
+                        fontsize=7.5, fontweight='bold', color='black',
+                        zorder=11,
+                        bbox={**label_box, 'edgecolor': color, 'linewidth': 0.9})
+                y += line_h * 0.85
             if y > group_top[gi]:
                 group_top[gi] = y
 
-        # ── Passo 3: labels de total acima da zona de small_labels ────────────
+        # ── Passo 3: labels de total acima da zona de percentuais ─────────────
         # Empilhados por experimento dentro de cada grupo, sem colidir com nada.
         for bar_x, total, j in totals_list:
             tc_exp = exp_txt_colors[j % len(exp_txt_colors)]
