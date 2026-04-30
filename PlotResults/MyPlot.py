@@ -546,7 +546,7 @@ class MyPlot(object):
             avg_sim    = _col(df, 'Avg_Simulation')
             avg_io     = _col(df, 'Avg_io_per_process')
             avg_coll   = _col(df, 'Avg_mpiCollective_per_process',
-                                   'Avg_mpiopen_per_process') * 2
+                                   'Avg_mpiopen_per_process')
             avg_comm   = _col(df, 'Avg_comunication_per_process')
             std_sim    = _col(df, 'Stdev_simulation')
             std_io     = _col(df, 'Stdev_io_per_process')
@@ -554,7 +554,7 @@ class MyPlot(object):
             std_coll   = _col(df, 'std_mpiCollective_per_process',
                                    'std_mpiopen_per_process')
             avg_comp   = np.maximum(avg_sim - avg_io - avg_coll, 0)
-            std_comp   = np.sqrt(np.maximum(std_sim**2 + std_io**2 + std_coll**2, 0))
+            std_comp   = np.sqrt(np.maximum(std_sim**2 - std_io**2 - std_coll**2, 0))
             total      = avg_comp + avg_comm + avg_io + avg_coll
             return (df.index.tolist(),
                     [avg_comp, avg_comm, avg_io, avg_coll],
