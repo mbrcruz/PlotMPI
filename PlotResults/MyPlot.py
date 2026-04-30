@@ -464,7 +464,9 @@ class MyPlot(object):
         # Centro de cada grupo de nós
         grp_centers = np.arange(n_nodes) * grp_span
 
-        fig, ax = plt.subplots(figsize=(max(10, n_nodes * number_blocks * n_exp * 0.55), 6))
+        legend_rows = number_blocks + n_exp
+        fig_h = max(7.5, 6 + legend_rows * 0.35)
+        fig, ax = plt.subplots(figsize=(max(10, n_nodes * number_blocks * n_exp * 0.55), fig_h))
 
         # Ticks no centro de cada grupo
         xtick_pos    = []
@@ -501,14 +503,16 @@ class MyPlot(object):
                        hatch=exp_hatches[j % len(exp_hatches)], label=lbl)
                  for j, (_, lbl) in enumerate(experiments)]
         ax.legend(handles=cat_h + exp_h,
-                  loc='upper right', fontsize=8, framealpha=0.9, ncol=2)
+                  loc='upper center', bbox_to_anchor=(0.5, 1.12),
+                  borderaxespad=0.0, fontsize=8, framealpha=0.9, ncol=2)
 
         ax.set_yscale('log')
         ax.set_xticks(xtick_pos)
-        ax.set_xticklabels(xtick_labels)
+        ax.set_xticklabels(xtick_labels, rotation=25, ha='right')
         ax.set_ylabel('Tempo médio de envio (s) — escala logarítmica')
+        ax.set_title(plotLabel)
         ax.grid(True, axis='y', linestyle='--', alpha=0.4)
-        plt.tight_layout()
+        plt.tight_layout(rect=[0, 0, 1, 0.90])
         plt.show()
 
 
@@ -806,9 +810,6 @@ class MyPlot(object):
         # Formata os ticks como números decimais normais
         ax.xaxis.set_major_formatter(ScalarFormatter())
         ax.ticklabel_format(style='plain', axis='x')   # evita notação científica
-        plt.title('Histograma do tamanho das mensagens enviadas dentro de 1 cenário.')
-        plt.xlabel('Tamanho (KBytes) em escala logarítmica')
-        plt.ylabel('Frequência')
         plt.xscale('log')  
         plt.yscale('log')   
         #plt.xlim(left=0.6, right=50000)
