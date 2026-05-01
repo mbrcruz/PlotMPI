@@ -549,7 +549,7 @@ class MyPlot(object):
             avg_sim    = _col(df, 'Avg_Simulation')
             avg_io     = _col(df, 'Avg_io_per_process')
             avg_coll   = _col(df, 'Avg_mpiCollective_per_process',
-                                   'Avg_mpiopen_per_process') * 6
+                                   'Avg_mpiopen_per_process')
             avg_comm   = _col(df, 'Avg_comunication_per_process')
             std_sim    = _col(df, 'Stdev_simulation')
             std_io     = _col(df, 'Stdev_io_per_process')
@@ -794,28 +794,57 @@ class MyPlot(object):
     
     def PlotHistogram(self,max_size_kb=0):
 
-        smallSizes=[]
+        labels = ["Ate 1 KB", "1 KB a 64 KB", "64 KB a 1 MB", "Acima de 1 MB"]
+        colors = ["#4e79a7", "#76b7b2", "#f58518", "#e45756"]
+        counts = [0, 0, 0, 0]
+
         for row in self.records:
-            smallSizesInKb= row['sizeBytes']/1024
-            if max_size_kb == 0 or smallSizesInKb < max_size_kb:
-                smallSizes.append(smallSizesInKb)                
-        plt.figure(figsize=(8,5))
-        plt.hist(smallSizes, bins=500, color='blue', alpha=0.7, edgecolor='black')
+            size_bytes = row["sizeBytes"]
+            size_kb = size_bytes / 1024
+            if max_size_kb != 0 and size_kb >= max_size_kb:
+                continue
 
-        ax = plt.gca()
+            if size_bytes <= 1024:
+                counts[0] += 1
+            elif size_bytes <= 64 * 1024:
+                counts[1] += 1
+            elif size_bytes <= 1024 * 1024:
+                counts[2] += 1
+            else:
+                counts[3] += 1
 
-        # Coloca ticks principais em potências de 10
+        total = sum(counts)
+        percentages = [(count / total * 100) if total > 0 else 0 for count in counts]
+        visible_counts = [count if count > 0 else np.nan for count in counts]
+
+        def format_count(value):
+            return f"{value:,}".replace(",", ".")
+
+        fig, ax = plt.subplots(figsize=(11, 5))
+        y_positions = np.arange(len(labels))
+        ax.barh(y_positions, visible_counts, color=colors, height=0.62)
+
+        ax.set_yticks(y_positions)
+        ax.set_yticklabels(labels)
+        ax.invert_yaxis()
+        ax.set_xscale("log")
+        ax.set_xlabel("Quantidade de mensagens (escala logaritmica)")
+
+        max_count = max(counts) if counts else 0
+        right_limit = max(max_count * 2, 10)
+        ax.set_xlim(left=1, right=right_limit)
+
         ax.xaxis.set_major_locator(LogLocator(base=10.0, subs=None))
-        # Formata os ticks como números decimais normais
         ax.xaxis.set_major_formatter(ScalarFormatter())
-        ax.ticklabel_format(style='plain', axis='x')   # evita notação científica
-        plt.xscale('log')  
-        plt.yscale('log')   
-        #plt.xlim(left=0.6, right=50000)
-        #plt.xticks([1, 1000, 10000, 20000,30000,50000])
-        ticks = [1, 1000, 50000]
-        plt.xticks(ticks, [str(t) for t in ticks])
-        plt.grid(axis='y', linestyle='--', alpha=0.7)
+        ax.ticklabel_format(style="plain", axis="x")
+        ax.grid(True, axis="x", which="both", linestyle="-", alpha=0.25)
+        ax.set_axisbelow(True)
+
+        for y, count, pct in zip(y_positions, counts, percentages):
+            x = count * 1.08 if count > 0 else 1.08
+            ax.text(x, y, f"{format_count(count)} ({pct:.1f}%)",
+                    va="center", ha="left", fontsize=10)
+
         plt.tight_layout()
         plt.show()
 
