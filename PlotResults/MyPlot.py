@@ -828,7 +828,7 @@ class MyPlot(object):
         ax.set_yticklabels(labels)
         ax.invert_yaxis()
         ax.set_xscale("log")
-        ax.set_xlabel("Quantidade de mensagens (escala logaritmica)")
+        ax.set_xlabel("Quantidade de blocos de dados (escala logaritmica)")
 
         max_count = max(counts) if counts else 0
         right_limit = max(max_count * 2, 10)
@@ -837,6 +837,7 @@ class MyPlot(object):
         ax.xaxis.set_major_locator(LogLocator(base=10.0, subs=None))
         ax.xaxis.set_major_formatter(ScalarFormatter())
         ax.ticklabel_format(style="plain", axis="x")
+        ax.tick_params(axis="x", which="both", labelbottom=False)
         ax.grid(True, axis="x", which="both", linestyle="-", alpha=0.25)
         ax.set_axisbelow(True)
 
