@@ -456,17 +456,17 @@ class MyPlot(object):
         n_exp     = len(experiments)
 
         bar_w       = 0.18                   # largura de cada barra individual
-        blk_gap     = 0.05                   # espaço entre categorias de tamanho
-        grp_gap     = 0.6                    # espaço entre grupos de nós
+        blk_gap     = 0.015                  # espaço entre categorias de tamanho
+        grp_gap     = 0.25                   # espaço entre grupos de nós
         blk_span    = n_exp * bar_w + blk_gap
         grp_span    = number_blocks * blk_span + grp_gap
 
         # Centro de cada grupo de nós
         grp_centers = np.arange(n_nodes) * grp_span
 
-        legend_rows = number_blocks + n_exp
-        fig_h = max(7.5, 6 + legend_rows * 0.35)
-        fig, ax = plt.subplots(figsize=(max(10, n_nodes * number_blocks * n_exp * 0.55), fig_h))
+        fig_w = max(12, n_nodes * number_blocks * n_exp * 0.70)
+        fig_h = 8.5
+        fig, ax = plt.subplots(figsize=(fig_w, fig_h))
 
         # Ticks no centro de cada grupo
         xtick_pos    = []
@@ -491,7 +491,7 @@ class MyPlot(object):
                     blk_lbl = block_labels[bi] if ni == 0 and j == 0 else '_nolegend_'
                     ax.bar(bar_x, avg_v, bar_w,
                            yerr=std_v, capsize=4,
-                           color=color, edgecolor='white', hatch=hatch,
+                           color=color, edgecolor='#555', linewidth=0.35, hatch=hatch,
                            label=blk_lbl,
                            error_kw=dict(elinewidth=1.2, capthick=1.2, ecolor='#444'))
 
@@ -503,15 +503,15 @@ class MyPlot(object):
                        hatch=exp_hatches[j % len(exp_hatches)], label=lbl)
                  for j, (_, lbl) in enumerate(experiments)]
         ax.legend(handles=cat_h + exp_h,
-                  loc='upper center', bbox_to_anchor=(0.5, 1.12),
-                  borderaxespad=0.0, fontsize=8, framealpha=0.9, ncol=2)
+                  loc='upper left', fontsize=11, framealpha=0.9, ncol=2)
 
         ax.set_yscale('log')
         ax.set_xticks(xtick_pos)
-        ax.set_xticklabels(xtick_labels, rotation=25, ha='right')
-        ax.set_ylabel('Tempo médio de envio (s) — escala logarítmica')
+        ax.set_xticklabels(xtick_labels, rotation=25, ha='right', fontsize=11)
+        ax.tick_params(axis='y', labelsize=11)
+        ax.set_ylabel('Tempo médio de envio (s) — escala logarítmica', fontsize=12)
         ax.grid(True, axis='y', linestyle='--', alpha=0.4)
-        plt.tight_layout(rect=[0, 0, 1, 0.90])
+        plt.tight_layout()
         plt.show()
 
 
