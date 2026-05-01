@@ -510,7 +510,6 @@ class MyPlot(object):
         ax.set_xticks(xtick_pos)
         ax.set_xticklabels(xtick_labels, rotation=25, ha='right')
         ax.set_ylabel('Tempo médio de envio (s) — escala logarítmica')
-        ax.set_title(plotLabel)
         ax.grid(True, axis='y', linestyle='--', alpha=0.4)
         plt.tight_layout(rect=[0, 0, 1, 0.90])
         plt.show()
