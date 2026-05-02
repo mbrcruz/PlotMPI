@@ -524,19 +524,14 @@ class MyPlot(object):
         plotLabel   : título do gráfico
 
         Segmentos grandes  (>= large_threshold) → tempo dentro da pilha
-        Percentuais de todos os segmentos       → zona acima das barras
+        Segmentos pequenos                       → tempo acima da pilha
         """
         from matplotlib.patches import Patch
 
         seg_colors      = ['#4caf50', '#1976d2', '#e57373', '#fbc02d']
         seg_labels_txt  = ['Computação', 'Comunicação', 'E/S', 'Coletiva MPI']
         exp_hatches     = ['', '///']
-        exp_txt_colors  = ['#1a1a1a', '#c62828', '#1565c0', '#2e7d32']
         dark_bg         = {'#1976d2'}
-        label_box       = dict(boxstyle='round,pad=0.18',
-                               facecolor='white', edgecolor='none',
-                               alpha=0.92)
-
         def _col(df, *names):
             """Retorna df[name] para o primeiro nome encontrado nas colunas."""
             for name in names:
@@ -592,12 +587,7 @@ class MyPlot(object):
         clearance = global_max * 0.08
 
         fig, ax = plt.subplots(figsize=(max(10, n_nodes * (n_exp * bar_w + grp_gap) * 2.2), 9.5))
-        ax2 = ax.twinx()
-
-        # pct_labels   : bar_x → {'gi': group_index, 'items': [(txt, color)]}
-        # totals_list  : [(bar_x_array, total_array, j)] — renderizados por último
-        pct_labels   = {}
-        totals_list  = []
+        group_top = group_max + clearance
 
         for j, ((_, exp_label), (nodes, seg_v, seg_s, total)) in enumerate(
                 zip(experiments, loaded)):
@@ -629,11 +619,6 @@ class MyPlot(object):
                                     fmt='none', ecolor='#444',
                                     elinewidth=1.2, capthick=1.2,
                                     capsize=3, zorder=9, clip_on=True)
-                    key = round(bar_x[i], 8)
-                    if key not in pct_labels:
-                        pct_labels[key] = {'gi': i, 'items': []}
-                    pct_labels[key]['items'].append((f'{pct:.1f}%', color))
-
                     if pct >= PCT_LARGE:
                         # Segmento grande: apenas o tempo dentro da pilha.
                         tc = 'white' if color in dark_bg else 'black'
@@ -641,50 +626,20 @@ class MyPlot(object):
                                 ha='center', va='center',
                                 fontsize=8.5, fontweight='bold', color=tc,
                                 clip_on=True, zorder=10)
+                    else:
+                        y = group_top[i]
+                        ax.text(bar_x[i], y, f'{vals[i]:.0f}s',
+                                ha='center', va='bottom',
+                                fontsize=7.5, fontweight='bold',
+                                color=color, zorder=11)
+                        group_top[i] += line_h * 0.85
                 bots += vals
 
-            totals_list.append((bar_x.copy(), total.copy(), j))
-
-        # ── Passo 2: zona de percentuais, rastreando topo por grupo ───────────
-        # group_top[i] = próxima y disponível para o grupo i após pct_labels
-        group_top = group_max + clearance   # ponto de partida de cada grupo
-
-        for bx, data in pct_labels.items():
-            gi = data['gi']
-            y  = group_max[gi] + clearance
-            for txt, color in data['items']:
-                ax.text(bx, y, txt,
-                        ha='center', va='bottom',
-                        fontsize=7.5, fontweight='bold', color='black',
-                        zorder=11,
-                        bbox={**label_box, 'edgecolor': color, 'linewidth': 0.9})
-                y += line_h * 0.85
-            if y > group_top[gi]:
-                group_top[gi] = y
-
-        # ── Passo 3: labels de total acima da zona de percentuais ─────────────
-        # Empilhados por experimento dentro de cada grupo, sem colidir com nada.
-        for bar_x, total, j in totals_list:
-            tc_exp = exp_txt_colors[j % len(exp_txt_colors)]
-            for i, tot in enumerate(total):
-                y = group_top[i] + j * line_h * 0.85
-                ax.text(bar_x[i], y, f'{tot:.0f}s',
-                        ha='center', va='bottom',
-                        fontsize=7.5, fontweight='bold', color=tc_exp)
-
-        max_label_top = max(
-            group_top[i] + n_exp * line_h * 0.85
-            for i in range(n_nodes)
-        )
+        max_label_top = float(group_top.max())
 
         # ── Eixos ─────────────────────────────────────────────────────────────
         ylim_top = max(global_max * 1.4, max_label_top + line_h)
         ax.set_ylim(0, ylim_top)
-        ax2.set_ylim(0, ylim_top / global_max * 100)
-        ax2.yaxis.set_major_formatter(mticker.FuncFormatter(lambda v, _: f'{v:.0f}%'))
-        ax2.set_ylabel('Proporção do tempo total (%)', color='#555')
-        ax2.tick_params(axis='y', labelcolor='#555')
-
         ax.set_xticks(X)
         ax.set_xticklabels([f'{nd} Nodes' for nd in all_nodes])
         ax.set_ylabel('Tempo médio por processo (s)')
