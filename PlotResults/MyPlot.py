@@ -221,7 +221,7 @@ class MyPlot(object):
         Stdev_time_per_record4=0
         
         if len(self.records1) >0:
-            Size_time_per_record1 = df1["timeSec"].count()/10
+            Size_time_per_record1 = df1["timeSec"].count()/ 5
             Avg_time_per_record1 = df1.groupby("experiment")["timeSec"].mean().mean()
             Stdev_time_per_record1= df1.groupby("experiment")["timeSec"].mean().std()
             print(f'Count per record1 < {self.categories[0]} MB: {Size_time_per_record1}')
@@ -229,7 +229,7 @@ class MyPlot(object):
             print(f'Stdev per record1 < {self.categories[0]} MB: {Stdev_time_per_record1}')
 
         if len(self.records2) >0:
-            Size_time_per_record2 = df2["timeSec"].count()/10
+            Size_time_per_record2 = df2["timeSec"].count()/ 5 
             Avg_time_per_record2 = df2.groupby("experiment")["timeSec"].mean().mean()
             Stdev_time_per_record2= df2.groupby("experiment")["timeSec"].mean().std()
             print(f'Count per record2 < {self.categories[1]} MB: {Size_time_per_record2}')  
@@ -237,14 +237,14 @@ class MyPlot(object):
             print(f'Stdev per record2 < {self.categories[1]} MB: {Stdev_time_per_record2}')
 
         if len(self.records3) > 0:
-            Size_time_per_record3 = df3["timeSec"].count()/10
+            Size_time_per_record3 = df3["timeSec"].count()/ 5
             Avg_time_per_record3 = df3.groupby("experiment")["timeSec"].mean().mean()
             Stdev_time_per_record3= df3.groupby("experiment")["timeSec"].mean().std()
             print(f'Count per record3 < {self.categories[2]} MB: {Size_time_per_record3}')
             print(f'AVG per record3 < {self.categories[2]} MB: {Avg_time_per_record3}') 
             print(f'Stdev per record3 < {self.categories[2]} MB: {  Stdev_time_per_record3}')
         if len(self.records4) > 0:
-            Size_time_per_record4 = df4["timeSec"].count()/10
+            Size_time_per_record4 = df4["timeSec"].count()/ 5
             Avg_time_per_record4 = df4.groupby("experiment")["timeSec"].mean().mean()
             Stdev_time_per_record4= df4.groupby("experiment")["timeSec"].mean().std()
             print(f'Count per record4 >= {self.categories[2]} MB: {Size_time_per_record4}')
