@@ -347,20 +347,30 @@ class MyPlot(object):
                 writer.writeheader()
             writer.writerow(linha)
             arquivo_csv.close()      
+
+    def _filter_nodes(self, df, nodes_filter):
+        if nodes_filter is None:
+            return df
+        if isinstance(nodes_filter, (int, np.integer)):
+            nodes_filter = [nodes_filter]
+        filtered_nodes = [node for node in nodes_filter if node in df.index]
+        return df.reindex(filtered_nodes)
             
-    def plotBandwidth(self, experiments, plotLabel):
+    def plotBandwidth(self, experiments, plotLabel, nodes_filter=None):
         """
         Banda agregada por configuração de nós, comparando múltiplos experimentos.
 
         experiments : list of (csv_path, label)
             Ex: [(r"...\\plot.csv", "Original"), (r"...\\plot.csv", "MPI-IO")]
         """
-        exp_colors  = ['#1976d2', '#e53935', '#43a047', '#fb8c00', '#8e24aa']
+        bandwidth_color = '#e57373'
         exp_hatches = ['', '///', '...', 'xxx']
 
         # Carrega todos os CSVs
-        dfs = [(pd.read_csv(p, index_col='Nodes'), lbl) for p, lbl in experiments]
+        dfs = [(self._filter_nodes(pd.read_csv(p, index_col='Nodes'), nodes_filter), lbl) for p, lbl in experiments]
         all_nodes = dfs[0][0].index.tolist()
+        if not all_nodes:
+            raise ValueError("Nenhuma configuracao de nodes encontrada para o filtro informado.")
         n_nodes   = len(all_nodes)
         n_exp     = len(experiments)
         bar_w     = 0.7 / n_exp
@@ -369,11 +379,12 @@ class MyPlot(object):
         fig, ax = plt.subplots(figsize=(max(8, n_nodes * n_exp * 1.2), 5))
 
         for j, (df, lbl) in enumerate(dfs):
-            color   = exp_colors[j % len(exp_colors)]
+            color   = bandwidth_color
             hatch   = exp_hatches[j % len(exp_hatches)]
             bar_x   = X + (j - (n_exp - 1) / 2) * bar_w
-            avg_bw  = df['Avg_bandwidth'].values
-            std_bw  = df['Stddev_bandwidth'].values
+            df_plot = df.reindex(all_nodes).fillna(0)
+            avg_bw  = df_plot['Avg_bandwidth'].values
+            std_bw  = df_plot['Stddev_bandwidth'].values
             ax.bar(bar_x, avg_bw, bar_w,
                    yerr=std_bw, capsize=6,
                    color=color, edgecolor='white', hatch=hatch,
@@ -423,7 +434,7 @@ class MyPlot(object):
         plt.show()
 
     
-    def plotBlocks(self, experiments, plotLabel, number_blocks=4):
+    def plotBlocks(self, experiments, plotLabel, nodes_filter=None, number_blocks=4):
         """
         Tempo médio por categoria de tamanho de mensagem, comparando experimentos.
 
@@ -450,8 +461,14 @@ class MyPlot(object):
         ]
         exp_hatches = ['', '///']
 
-        dfs       = [(pd.read_csv(p, index_col='Nodes'), lbl) for p, lbl in experiments]
+        if isinstance(nodes_filter, (int, np.integer)):
+            number_blocks = int(nodes_filter)
+            nodes_filter = None
+
+        dfs       = [(self._filter_nodes(pd.read_csv(p, index_col='Nodes'), nodes_filter), lbl) for p, lbl in experiments]
         all_nodes = dfs[0][0].index.tolist()
+        if not all_nodes:
+            raise ValueError("Nenhuma configuracao de nodes encontrada para o filtro informado.")
         n_nodes   = len(all_nodes)
         n_exp     = len(experiments)
 
@@ -515,7 +532,7 @@ class MyPlot(object):
         plt.show()
 
 
-    def plotExecutionTime(self, experiments, plotLabel):
+    def plotExecutionTime(self, experiments, plotLabel, nodes_filter=None):
         """
         Stacked bar com alturas reais (s), barras lado a lado por experimento.
 
@@ -540,7 +557,7 @@ class MyPlot(object):
             raise KeyError(f'Nenhuma das colunas encontrada: {names}')
 
         def _load(csv_path):
-            df         = pd.read_csv(csv_path, index_col='Nodes')
+            df         = self._filter_nodes(pd.read_csv(csv_path, index_col='Nodes'), nodes_filter)
             avg_sim    = _col(df, 'Avg_Simulation')
             avg_io     = _col(df, 'Avg_io_per_process')
             avg_coll   = _col(df, 'Avg_mpiCollective_per_process',
@@ -562,6 +579,8 @@ class MyPlot(object):
 
         loaded     = [_load(p) for p, _ in experiments]
         all_nodes  = loaded[0][0]
+        if not all_nodes:
+            raise ValueError("Nenhuma configuracao de nodes encontrada para o filtro informado.")
         n_nodes    = len(all_nodes)
         n_exp      = len(experiments)
         bar_w      = 0.35
