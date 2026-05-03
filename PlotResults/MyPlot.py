@@ -552,7 +552,8 @@ class MyPlot(object):
             std_coll   = _col(df, 'std_mpiCollective_per_process',
                                    'std_mpiopen_per_process')
             avg_comp   = np.maximum(avg_sim - avg_io - avg_coll, 0)
-            std_comp   = np.sqrt(np.maximum(std_sim**2 - std_io**2 - std_coll**2, 0))
+            std_comp   = np.sqrt(np.maximum(std_sim**2 - std_io**2 - std_coll**2, std_sim))
+
             total      = avg_comp + avg_comm + avg_io + avg_coll
             return (df.index.tolist(),
                     [avg_comp, avg_comm, avg_io, avg_coll],
