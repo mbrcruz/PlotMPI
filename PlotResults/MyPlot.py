@@ -529,7 +529,7 @@ class MyPlot(object):
         from matplotlib.patches import Patch
 
         seg_colors      = ['#4caf50', '#1976d2', '#e57373', '#fbc02d']
-        seg_labels_txt  = ['Computação', 'Comunicação', 'E/S', 'Coletiva MPI']
+        seg_labels_txt  = ['Computação', 'Comunicação', 'E/S', 'Coordenação MPI-IO']
         exp_hatches     = ['', '///']
         dark_bg         = {'#1976d2'}
         def _col(df, *names):
