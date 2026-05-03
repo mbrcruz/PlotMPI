@@ -435,12 +435,12 @@ class MyPlot(object):
             Dentro de cada grupo: sub-grupos por categoria de tamanho,
             dentro de cada sub-grupo: uma barra por experimento.
         """
-        block_colors  = ['#bdbdbd', '#4caf50', '#29b6f6', '#e53935']
+        block_colors  = ['#6B6B6B', '#8E44AD', '#C2185B', '#795548']
         block_labels  = [
-            f'até {self.categories[0]*1000:.0f} KB',
-            f'até {self.categories[1]*1000:.0f} KB',
-            f'até {self.categories[2]*1000:.0f} MB',
-            f'até {self.categories[3]:.0f} MB',
+            'até 1 KB',
+            'até 128 KB',
+            'até 1 MB',
+            'até 50 MB',
         ]
         block_cols    = [
             ('Avg_time_per_record1', 'Stdev_time_per_record1'),
@@ -750,8 +750,8 @@ class MyPlot(object):
     
     def PlotHistogram(self,max_size_kb=0):
 
-        labels = ["Ate 1 KB", "1 KB a 64 KB", "64 KB a 1 MB", "Acima de 1 MB"]
-        colors = ["#4e79a7", "#76b7b2", "#f58518", "#e45756"]
+        labels = ["Até 1 KB", "Até 128 KB", "Até 1 MB", "Até 50 MB"]
+        colors = ["#6B6B6B", "#8E44AD", "#C2185B", "#795548"]
         counts = [0, 0, 0, 0]
 
         for row in self.records:
@@ -762,11 +762,11 @@ class MyPlot(object):
 
             if size_bytes <= 1024:
                 counts[0] += 1
-            elif size_bytes <= 64 * 1024:
+            elif size_bytes <= 128 * 1024:
                 counts[1] += 1
             elif size_bytes <= 1024 * 1024:
                 counts[2] += 1
-            else:
+            elif size_bytes <= 50 * 1024 * 1024:
                 counts[3] += 1
 
         total = sum(counts)
