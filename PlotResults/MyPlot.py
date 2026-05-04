@@ -602,7 +602,7 @@ class MyPlot(object):
             avg_sim    = _col(df, 'Avg_Simulation')
             avg_io     = _col(df, 'Avg_io_per_process')
             avg_coll   = _col(df, 'Avg_mpiCollective_per_process',
-                                   'Avg_mpiopen_per_process') * 6
+                                   'Avg_mpiopen_per_process')
             avg_comm   = _col(df, 'Avg_comunication_per_process')
             std_sim    = _col(df, 'Stdev_simulation')
             std_io     = _col(df, 'Stdev_io_per_process')
