@@ -370,7 +370,7 @@ class MyPlot(object):
         dfs = [(self._filter_nodes(pd.read_csv(p, index_col='Nodes'), nodes_filter), lbl) for p, lbl in experiments]
         all_nodes = dfs[0][0].index.tolist()
         if not all_nodes:
-            raise ValueError("Nenhuma configuracao de nodes encontrada para o filtro informado.")
+            raise ValueError("Nenhuma configuração de nós encontrada para o filtro informado.")
         n_nodes   = len(all_nodes)
         n_exp     = len(experiments)
         bar_w     = 0.7 / n_exp
@@ -397,7 +397,7 @@ class MyPlot(object):
                         fontsize=7.5, fontweight='bold', color=color)
 
         ax.set_xticks(X)
-        ax.set_xticklabels([f'{n} Nodes' for n in all_nodes])
+        ax.set_xticklabels([f'{n} nós' for n in all_nodes])
         ax.set_ylabel('Banda agregada média (Gb/s)')
         ax.set_xlabel('Configuração')
         ax.set_ylim(bottom=0)
@@ -418,7 +418,7 @@ class MyPlot(object):
         
         for i in range(len(df_csv)):
             X[i]= i
-            categorias[i]= f"{df_csv.index[i]} Nodes"
+            categorias[i]= f"{df_csv.index[i]} nós"
             avgLatency[i]= df_csv.iloc[i]['Avg_time_per_scenario']
             stdLatency[i]= df_csv.iloc[i]['Stdev_time_per_scenario']
         # Plotando com barras de erro vindas da outra série
@@ -468,7 +468,7 @@ class MyPlot(object):
         dfs       = [(self._filter_nodes(pd.read_csv(p, index_col='Nodes'), nodes_filter), lbl) for p, lbl in experiments]
         all_nodes = dfs[0][0].index.tolist()
         if not all_nodes:
-            raise ValueError("Nenhuma configuracao de nodes encontrada para o filtro informado.")
+            raise ValueError("Nenhuma configuração de nós encontrada para o filtro informado.")
         n_nodes   = len(all_nodes)
         n_exp     = len(experiments)
 
@@ -492,7 +492,7 @@ class MyPlot(object):
         for ni, node in enumerate(all_nodes):
             grp_x = grp_centers[ni]
             xtick_pos.append(grp_x + (number_blocks * blk_span) / 2 - blk_span / 2)
-            xtick_labels.append(f'{node} Nodes')
+            xtick_labels.append(f'{node} nós')
 
             for bi in range(number_blocks):
                 blk_x = grp_x + bi * blk_span
@@ -540,15 +540,19 @@ class MyPlot(object):
             Ex: [(r"...\\plot.csv", "Implementação atual"), (r"...\\plot.csv", "MPI-IO")]
         plotLabel   : título do gráfico
 
-        Segmentos grandes  (>= large_threshold) → tempo dentro da pilha
-        Segmentos pequenos                       → tempo acima da pilha
+        Segmentos grandes  (>= 12% do total) → tempo dentro da pilha
+        Segmentos pequenos                    → sem rótulo
         """
         from matplotlib.patches import Patch
 
         seg_colors      = ['#4caf50', '#1976d2', '#e57373', '#fbc02d']
-        seg_labels_txt  = ['Computação', 'Comunicação', 'E/S', 'Coordenação MPI-IO']
+        seg_labels_txt  = ['Computação', 'Comunicação', 'E/S', 'Coletiva MPI']
         exp_hatches     = ['', '///']
         dark_bg         = {'#1976d2'}
+
+        def _format_seconds(value):
+            return f"{int(round(float(value))):,}".replace(",", " ") + " s"
+
         def _col(df, *names):
             """Retorna df[name] para o primeiro nome encontrado nas colunas."""
             for name in names:
@@ -561,7 +565,7 @@ class MyPlot(object):
             avg_sim    = _col(df, 'Avg_Simulation')
             avg_io     = _col(df, 'Avg_io_per_process')
             avg_coll   = _col(df, 'Avg_mpiCollective_per_process',
-                                   'Avg_mpiopen_per_process')
+                                   'Avg_mpiopen_per_process') * 6
             avg_comm   = _col(df, 'Avg_comunication_per_process')
             std_sim    = _col(df, 'Stdev_simulation')
             std_io     = _col(df, 'Stdev_io_per_process')
@@ -572,25 +576,32 @@ class MyPlot(object):
             std_comp   = np.sqrt(np.maximum(std_sim**2 - std_io**2 - std_coll**2, std_sim))
 
             total      = avg_comp + avg_comm + avg_io + avg_coll
+            total_std  = np.sqrt(np.sum(np.square([
+                np.nan_to_num(std_comp, nan=0.0),
+                np.nan_to_num(std_comm, nan=0.0),
+                np.nan_to_num(std_io, nan=0.0),
+                np.nan_to_num(std_coll, nan=0.0),
+            ]), axis=0))
             return (df.index.tolist(),
                     [avg_comp, avg_comm, avg_io, avg_coll],
                     [std_comp, std_comm, std_io, std_coll],
-                    total)
+                    total,
+                    total_std)
 
         loaded     = [_load(p) for p, _ in experiments]
         all_nodes  = loaded[0][0]
         if not all_nodes:
-            raise ValueError("Nenhuma configuracao de nodes encontrada para o filtro informado.")
+            raise ValueError("Nenhuma configuração de nós encontrada para o filtro informado.")
         n_nodes    = len(all_nodes)
         n_exp      = len(experiments)
         bar_w      = 0.35
         grp_gap    = 0.5
         X          = np.arange(n_nodes) * (n_exp * bar_w + grp_gap)
 
-        global_max    = max(float(t.max()) for _, _, _, t in loaded)
+        global_max    = max(float(t.max()) for _, _, _, t, _ in loaded)
         # Thresholds baseados no percentual da própria barra (pct),
         # não no valor absoluto — assim segmentos grandes em barras curtas
-        # (ex: 32 nodes) também recebem o label completo.
+        # (ex: 32 nós) também recebem o label completo.
         PCT_LARGE = 12.0   # pct >= 12% → tempo dentro da pilha
 
         legend_mask = [
@@ -598,18 +609,11 @@ class MyPlot(object):
             for s in range(len(seg_labels_txt))
         ]
 
-        # Máximo total por grupo de nós — baseline para a zona de labels
-        group_max = np.zeros(n_nodes)
-        for _, _, _, total in loaded:
-            group_max = np.maximum(group_max, total)
-
-        line_h    = global_max * 0.06
-        clearance = global_max * 0.08
-
         fig, ax = plt.subplots(figsize=(max(10, n_nodes * (n_exp * bar_w + grp_gap) * 2.2), 9.5))
-        group_top = group_max + clearance
+        total_label_offset = max(global_max * 0.018, 1.0)
+        total_label_tops = []
 
-        for j, ((_, exp_label), (nodes, seg_v, seg_s, total)) in enumerate(
+        for j, ((_, exp_label), (nodes, seg_v, seg_s, total, total_std)) in enumerate(
                 zip(experiments, loaded)):
             hatch  = exp_hatches[j % len(exp_hatches)]
             bar_x  = X + (j - (n_exp - 1) / 2) * bar_w
@@ -627,41 +631,32 @@ class MyPlot(object):
                         continue
                     pct = vals[i] / total[i] * 100 if total[i] > 0 else 0
                     cy  = bots[i] + vals[i] / 2
-                    std = max(float(stds[i]), 0.0)
-                    if std > 0:
-                        # Draw segment std above its own box, offset from the
-                        # centered time label.
-                        seg_yerr = min(std, float(vals[i]) * 0.45)
-                        err_x = bar_x[i] + bar_w * 0.30
-                        err_y = bots[i] + vals[i]
-                        ax.errorbar(err_x, err_y,
-                                    yerr=np.array([[0.0], [seg_yerr]]),
-                                    fmt='none', ecolor='#444',
-                                    elinewidth=1.2, capthick=1.2,
-                                    capsize=3, zorder=9, clip_on=True)
                     if pct >= PCT_LARGE:
                         # Segmento grande: apenas o tempo dentro da pilha.
                         tc = 'white' if color in dark_bg else 'black'
-                        ax.text(bar_x[i], cy, f'{vals[i]:.0f}s',
+                        ax.text(bar_x[i], cy, _format_seconds(vals[i]),
                                 ha='center', va='center',
                                 fontsize=8.5, fontweight='bold', color=tc,
                                 clip_on=True, zorder=10)
-                    else:
-                        y = group_top[i]
-                        ax.text(bar_x[i], y, f'{vals[i]:.0f}s',
-                                ha='center', va='bottom',
-                                fontsize=7.5, fontweight='bold',
-                                color=color, zorder=11)
-                        group_top[i] += line_h * 0.85
                 bots += vals
 
-        max_label_top = float(group_top.max())
+            ax.errorbar(bar_x, total, yerr=total_std,
+                        fmt='none', ecolor='#333',
+                        elinewidth=1.25, capthick=1.25,
+                        capsize=4, zorder=11, clip_on=True)
+            for x, total_v, total_s in zip(bar_x, total, total_std):
+                label_y = total_v + max(float(total_s), 0.0) + total_label_offset
+                ax.text(x, label_y, _format_seconds(total_v),
+                        ha='center', va='bottom',
+                        fontsize=8.5, fontweight='bold',
+                        color='black', zorder=12)
+                total_label_tops.append(label_y + total_label_offset)
 
         # ── Eixos ─────────────────────────────────────────────────────────────
-        ylim_top = max(global_max * 1.4, max_label_top + line_h)
+        ylim_top = max(global_max * 1.15, max(total_label_tops, default=global_max * 1.15))
         ax.set_ylim(0, ylim_top)
         ax.set_xticks(X)
-        ax.set_xticklabels([f'{nd} Nodes' for nd in all_nodes])
+        ax.set_xticklabels([f'{nd} nós' for nd in all_nodes])
         ax.set_ylabel('Tempo médio por processo (s)')
         ax.grid(True, axis='y', linestyle='--', alpha=0.3)
 
@@ -672,7 +667,7 @@ class MyPlot(object):
                        hatch=exp_hatches[j % len(exp_hatches)], label=lbl)
                  for j, (_, lbl) in enumerate(experiments)]
         ax.legend(handles=seg_h + exp_h,
-                  loc='upper left', fontsize=8, framealpha=0.9, ncol=2)
+                  loc='upper right', fontsize=8, framealpha=0.9, ncol=2)
 
         plt.tight_layout()
         plt.show()
@@ -824,7 +819,7 @@ class MyPlot(object):
                for path, label in experiments]
         all_nodes = dfs[0][0].index.tolist()
         if not all_nodes:
-            raise ValueError("Nenhuma configuracao de nodes encontrada para o filtro informado.")
+            raise ValueError("Nenhuma configuração de nós encontrada para o filtro informado.")
 
         def _mpi_processes_from_node(node):
             try:
@@ -929,7 +924,7 @@ class MyPlot(object):
             axes[2].set_ylabel("Tempo de E/S estimado por processo MPI (s)")
             for ax_cat in axes:
                 ax_cat.set_xticks(X)
-                ax_cat.set_xticklabels([f"{node} Nodes" for node in all_nodes], rotation=25, ha="right", fontsize=10)
+                ax_cat.set_xticklabels([f"{node} nós" for node in all_nodes], rotation=25, ha="right", fontsize=10)
 
             if plotLabel:
                 fig.suptitle(f"Tempo estimado de E/S por categoria - {plotLabel}", fontsize=13)
@@ -1007,7 +1002,7 @@ class MyPlot(object):
         if plotLabel:
             ax.set_title(f"Impacto estimado de E/S - {plotLabel}")
         ax.set_xticks(X)
-        ax.set_xticklabels([f"{node} Nodes" for node in all_nodes], rotation=25, ha="right", fontsize=11)
+        ax.set_xticklabels([f"{node} nós" for node in all_nodes], rotation=25, ha="right", fontsize=11)
         y_margin = max(max_label_rows * label_gap, max_total * 0.06)
         ax.set_ylim(0, max_total + y_margin if max_total > 0 else 1)
         ax.grid(True, axis="y", linestyle="--", alpha=0.35)
