@@ -442,10 +442,11 @@ class MyPlot(object):
             Ex: [(r"...\\plot.csv", "Original"), (r"...\\plot.csv", "MPI-IO")]
 
         Organização do eixo X:
-            Grupos = contagem de nós.
-            Dentro de cada grupo: sub-grupos por categoria de tamanho,
-            dentro de cada sub-grupo: uma barra por experimento.
+            Subplots = categorias de tamanho.
+            Dentro de cada subplot: barras por implementação ao longo dos nós.
         """
+        from matplotlib.patches import Patch
+
         block_colors  = ['#6B6B6B', '#8E44AD', '#C2185B', '#795548']
         block_labels  = [
             'até 1 KB',
@@ -460,6 +461,7 @@ class MyPlot(object):
             ('Avg_time_per_record4', 'Stdev_time_per_record4'),
         ]
         exp_hatches = ['', '///']
+        y_min = 1e-5
 
         if isinstance(nodes_filter, (int, np.integer)):
             number_blocks = int(nodes_filter)
@@ -471,66 +473,101 @@ class MyPlot(object):
             raise ValueError("Nenhuma configuração de nós encontrada para o filtro informado.")
         n_nodes   = len(all_nodes)
         n_exp     = len(experiments)
+        n_blocks  = min(number_blocks, len(block_labels))
 
-        bar_w       = 0.18                   # largura de cada barra individual
-        blk_gap     = 0.015                  # espaço entre categorias de tamanho
-        grp_gap     = 0.25                   # espaço entre grupos de nós
-        blk_span    = n_exp * bar_w + blk_gap
-        grp_span    = number_blocks * blk_span + grp_gap
+        def _format_seconds(value):
+            value = float(value)
+            if value >= 100:
+                return f"{value:.0f} s"
+            if value >= 10:
+                return f"{value:.1f} s"
+            if value >= 1:
+                return f"{value:.2f} s"
+            if value >= 0.01:
+                return f"{value:.3f} s"
+            return f"{value:.1e} s"
 
-        # Centro de cada grupo de nós
-        grp_centers = np.arange(n_nodes) * grp_span
+        bar_w = min(0.32, 0.75 / max(n_exp, 1))
+        X = np.arange(n_nodes)
+        fig, axes = plt.subplots(
+            2, 2,
+            figsize=(max(11, n_nodes * n_exp * 1.05), 8.8),
+            sharex=True
+        )
+        axes = axes.ravel()
 
-        fig_w = max(12, n_nodes * number_blocks * n_exp * 0.70)
-        fig_h = 8.5
-        fig, ax = plt.subplots(figsize=(fig_w, fig_h))
+        for bi, ax_cat in enumerate(axes):
+            if bi >= n_blocks:
+                ax_cat.axis('off')
+                continue
 
-        # Ticks no centro de cada grupo
-        xtick_pos    = []
-        xtick_labels = []
+            avg_col, std_col = block_cols[bi]
+            category = block_labels[bi]
+            color = block_colors[bi]
+            category_max = y_min
+            bars_by_exp = []
 
-        for ni, node in enumerate(all_nodes):
-            grp_x = grp_centers[ni]
-            xtick_pos.append(grp_x + (number_blocks * blk_span) / 2 - blk_span / 2)
-            xtick_labels.append(f'{node} nós')
+            for j, (df, lbl) in enumerate(dfs):
+                df_plot = df.reindex(all_nodes).fillna(0)
+                avg_v = np.maximum(df_plot[avg_col].astype(float).values, y_min)
+                std_v = np.maximum(df_plot[std_col].astype(float).values, 0.0)
+                lower_err = np.minimum(std_v, np.maximum(avg_v - y_min, 0.0))
+                upper_err = std_v
+                yerr = np.vstack([lower_err, upper_err])
+                bar_x = X + (j - (n_exp - 1) / 2) * bar_w
+                hatch = exp_hatches[j % len(exp_hatches)]
 
-            for bi in range(number_blocks):
-                blk_x = grp_x + bi * blk_span
-                avg_col, std_col = block_cols[bi]
-                color = block_colors[bi]
+                ax_cat.bar(
+                    bar_x, avg_v, bar_w,
+                    yerr=yerr, capsize=4,
+                    color=color, edgecolor='#555', linewidth=0.45,
+                    hatch=hatch, label=lbl,
+                    error_kw=dict(elinewidth=1.0, capthick=1.0, ecolor='#444')
+                )
+                bars_by_exp.append((bar_x, avg_v, std_v, lbl))
 
-                for j, (df, _) in enumerate(dfs):
-                    hatch  = exp_hatches[j % len(exp_hatches)]
-                    bar_x  = blk_x + (j - (n_exp - 1) / 2) * bar_w
-                    avg_v  = df.loc[node, avg_col] if node in df.index else 0
-                    std_v  = df.loc[node, std_col] if node in df.index else 0
-                    # Entra na legenda só na primeira ocorrência
-                    blk_lbl = block_labels[bi] if ni == 0 and j == 0 else '_nolegend_'
-                    ax.bar(bar_x, avg_v, bar_w,
-                           yerr=std_v, capsize=4,
-                           color=color, edgecolor='#555', linewidth=0.35, hatch=hatch,
-                           label=blk_lbl,
-                           error_kw=dict(elinewidth=1.2, capthick=1.2, ecolor='#444'))
+                positive_tops = avg_v + std_v
+                category_max = max(category_max, float(np.nanmax(positive_tops)))
+                for x, value, std in zip(bar_x, avg_v, std_v):
+                    label_y = max(value + std, y_min) * 1.18
+                    ax_cat.text(
+                        x, label_y, _format_seconds(value),
+                        ha='center', va='bottom',
+                        fontsize=7.0, fontweight='bold',
+                        color=color, clip_on=True
+                    )
 
-        # Legenda de categorias (cores) + experimentos (hachuras)
-        from matplotlib.patches import Patch
-        cat_h = [Patch(facecolor=c, edgecolor='white', label=l)
-                 for c, l in zip(block_colors, block_labels)]
+            ax_cat.set_yscale('log')
+            ax_cat.set_ylim(y_min, max(category_max * 3.0, y_min * 10))
+            ax_cat.grid(True, axis='y', which='both', linestyle='--', alpha=0.35)
+            ax_cat.tick_params(axis='y', labelsize=9)
+
+            if bi in (0, 2):
+                ax_cat.set_ylabel('Tempo médio de envio (s)', fontsize=10)
+
+        for ax_cat in axes:
+            if ax_cat.has_data():
+                ax_cat.set_xticks(X)
+                ax_cat.set_xticklabels([f'{node} nós' for node in all_nodes],
+                                       rotation=25, ha='right', fontsize=10)
+
+
+        cat_h = [Patch(facecolor=c, edgecolor='#555', label=l)
+                 for c, l in zip(block_colors[:n_blocks], block_labels[:n_blocks])]
         exp_h = [Patch(facecolor='#ddd', edgecolor='#555',
                        hatch=exp_hatches[j % len(exp_hatches)], label=lbl)
                  for j, (_, lbl) in enumerate(experiments)]
-        ax.legend(handles=cat_h + exp_h,
-                  loc='upper left', fontsize=11, framealpha=0.9, ncol=2)
 
-        ax.set_yscale('log')
-        ax.set_xticks(xtick_pos)
-        ax.set_xticklabels(xtick_labels, rotation=25, ha='right', fontsize=11)
-        ax.tick_params(axis='y', labelsize=11)
-        ax.set_ylabel('Tempo médio de envio (s) — escala logarítmica', fontsize=12)
-        ax.grid(True, axis='y', linestyle='--', alpha=0.4)
-        plt.tight_layout()
+        fig.legend(handles=cat_h, title='Categoria',
+                   loc='upper left', bbox_to_anchor=(0.01, 0.995),
+                   fontsize=9, title_fontsize=9, framealpha=0.92, ncol=2)
+        fig.legend(handles=exp_h, title='Implementação',
+                   loc='upper right', bbox_to_anchor=(0.99, 0.995),
+                   fontsize=9, title_fontsize=9, framealpha=0.92, ncol=min(n_exp, 3))
+
+        plt.tight_layout(rect=[0, 0, 1, 0.92])
         plt.show()
-
+        return
 
     def plotExecutionTime(self, experiments, plotLabel, nodes_filter=None):
         """
