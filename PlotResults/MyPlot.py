@@ -769,7 +769,7 @@ class MyPlot(object):
     
     def plotIO(self, experiments, block_counts=None, nodes_filter=None,
                small_segment_pct=8, show_small_labels=False,
-               show_percent_panel=False):
+               show_percent_panel=False, separate_category_plots=True):
         """
         Compara o tempo estimado de E/S usando os tempos medios do plot.csv.
 
@@ -781,6 +781,8 @@ class MyPlot(object):
         percentual da propria pilha, mas os valores exibidos ficam em segundos.
         show_small_labels e mantido por compatibilidade; tempos pequenos ficam
         acima da barra empilhada.
+        separate_category_plots exibe um subplot separado para cada categoria
+        de bloco; use False para manter a barra empilhada original.
         """
         plotLabel = None
         if isinstance(block_counts, str):
@@ -873,6 +875,71 @@ class MyPlot(object):
         n_exp = len(dfs)
         bar_w = min(0.32, 0.75 / n_exp)
         X = np.arange(n_nodes)
+
+        if separate_category_plots:
+            fig, axes = plt.subplots(
+                2, 2,
+                figsize=(max(11, n_nodes * n_exp * 1.15), 8.5),
+                sharex=True
+            )
+            axes = axes.ravel()
+
+            for ax_cat, category, color in zip(axes, block_labels, block_colors):
+                rows_category = df_metrics[df_metrics["Categoria"] == category]
+                category_max = (
+                    float(rows_category["Tempo_E/S_estimado_s"].max())
+                    if not rows_category.empty
+                    else 0
+                )
+                label_gap = category_max * 0.035 if category_max > 0 else 1
+                y_top = category_max * 1.12 + label_gap if category_max > 0 else 1
+
+                for j, (_, label) in enumerate(dfs):
+                    bar_x = X + (j - (n_exp - 1) / 2) * bar_w
+                    values = []
+                    for node in all_nodes:
+                        row = df_metrics[
+                            (df_metrics["Experimento"] == label) &
+                            (df_metrics["Nodes"] == node) &
+                            (df_metrics["Categoria"] == category)
+                        ].iloc[0]
+                        values.append(row["Tempo_E/S_estimado_s"])
+
+                    values = np.array(values)
+                    hatch = exp_hatches[j % len(exp_hatches)]
+                    ax_cat.bar(
+                        bar_x, values, bar_w,
+                        color=color, edgecolor="#555", linewidth=0.35,
+                        hatch=hatch, label=label
+                    )
+
+                    for x, value in zip(bar_x, values):
+                        if value > 0:
+                            ax_cat.text(
+                                x, value + label_gap, _format_seconds(value),
+                                ha="center", va="bottom", fontsize=7.2,
+                                fontweight="bold", color=color
+                            )
+
+                ax_cat.set_title(category, fontsize=11)
+                ax_cat.set_ylim(0, y_top)
+                ax_cat.grid(True, axis="y", linestyle="--", alpha=0.35)
+
+            axes[0].set_ylabel("Tempo de E/S estimado por processo MPI (s)")
+            axes[2].set_ylabel("Tempo de E/S estimado por processo MPI (s)")
+            for ax_cat in axes:
+                ax_cat.set_xticks(X)
+                ax_cat.set_xticklabels([f"{node} Nodes" for node in all_nodes], rotation=25, ha="right", fontsize=10)
+
+            if plotLabel:
+                fig.suptitle(f"Tempo estimado de E/S por categoria - {plotLabel}", fontsize=13)
+            else:
+                fig.suptitle("Tempo estimado de E/S por categoria", fontsize=13)
+
+            axes[0].legend(loc="upper left", fontsize=8, framealpha=0.9)
+            plt.tight_layout()
+            plt.show()
+            return df_metrics
 
         fig_h = 7.5
         fig, ax = plt.subplots(figsize=(max(10, n_nodes * n_exp * 1.15), fig_h))
