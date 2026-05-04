@@ -779,7 +779,8 @@ class MyPlot(object):
         experiments segue o formato: [(plot_csv_ou_diretorio, label), ...].
         small_segment_pct define o limite para rotulos internos, baseado no
         percentual da propria pilha, mas os valores exibidos ficam em segundos.
-        show_small_labels exibe, se True, tempos pequenos acima das barras.
+        show_small_labels e mantido por compatibilidade; tempos pequenos ficam
+        acima da barra empilhada.
         """
         plotLabel = None
         if isinstance(block_counts, str):
@@ -844,7 +845,7 @@ class MyPlot(object):
         for df, label in dfs:
             df_plot = df.reindex(all_nodes).fillna(0)
             for node, row in df_plot.iterrows():
-                mpi_processes = _mpi_processes_from_node(node)
+                mpi_processes = _mpi_processes_from_node(node) * self.number_scenarios_per_nodes
                 estimated_total_times = np.array([
                     float(row[col]) * count for col, count in zip(block_cols, block_counts)
                 ])
@@ -922,7 +923,7 @@ class MyPlot(object):
                         ax.text(x, bottom + value / 2, _format_seconds(value),
                                 ha="center", va="center", fontsize=7.5,
                                 fontweight="bold", color="white")
-                    elif show_small_labels and value > 0:
+                    elif value > 0:
                         label_row = small_label_counts[i]
                         total = total_by_exp[label][i]
                         x_text = x + ((label_row % 2) - 0.5) * bar_w * 0.55
@@ -940,7 +941,7 @@ class MyPlot(object):
             ax.set_title(f"Impacto estimado de E/S - {plotLabel}")
         ax.set_xticks(X)
         ax.set_xticklabels([f"{node} Nodes" for node in all_nodes], rotation=25, ha="right", fontsize=11)
-        y_margin = max_label_rows * label_gap if show_small_labels else max_total * 0.06
+        y_margin = max(max_label_rows * label_gap, max_total * 0.06)
         ax.set_ylim(0, max_total + y_margin if max_total > 0 else 1)
         ax.grid(True, axis="y", linestyle="--", alpha=0.35)
 
