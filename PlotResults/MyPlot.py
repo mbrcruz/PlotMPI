@@ -767,6 +767,196 @@ class MyPlot(object):
     #     plt.tight_layout()
     #     plt.show()
     
+    def plotIO(self, experiments, block_counts=None, nodes_filter=None,
+               small_segment_pct=8, show_small_labels=False,
+               show_percent_panel=False):
+        """
+        Compara o tempo estimado de E/S usando os tempos medios do plot.csv.
+
+        O segundo argumento pode ser um rotulo do grafico, como nas outras
+        funcoes de plot, ou a lista block_counts para compatibilidade.
+        block_counts segue a ordem: ate 1 KB, ate 128 KB, ate 1 MB, ate 50 MB.
+        experiments segue o formato: [(plot_csv_ou_diretorio, label), ...].
+        small_segment_pct define o limite para rotulos internos, baseado no
+        percentual da propria pilha, mas os valores exibidos ficam em segundos.
+        show_small_labels exibe, se True, tempos pequenos acima das barras.
+        """
+        plotLabel = None
+        if isinstance(block_counts, str):
+            plotLabel = block_counts
+            block_counts = None
+
+        block_labels = ["Até 1 KB", "Até 128 KB", "Até 1 MB", "Até 50 MB"]
+        block_colors = ["#6B6B6B", "#8E44AD", "#C2185B", "#795548"]
+        block_cols = [
+            "Avg_time_per_record1",
+            "Avg_time_per_record2",
+            "Avg_time_per_record3",
+            "Avg_time_per_record4",
+        ]
+        block_counts = [1801728, 152082, 267264, 27648] if block_counts is None else block_counts
+        if len(block_counts) != len(block_labels):
+            raise ValueError("block_counts deve ter 4 valores: [ate 1 KB, ate 128 KB, ate 1 MB, ate 50 MB].")
+        exp_hatches = ["", "///"]
+
+        def _load_plot_csv(source):
+            if source is None:
+                source = os.path.join(self.base_directory, "../plot.csv")
+            elif isinstance(source, pd.DataFrame):
+                return source.copy()
+            elif hasattr(source, "base_directory"):
+                source = os.path.join(source.base_directory, "../plot.csv")
+
+            source = os.fspath(source)
+            if os.path.isdir(source):
+                direct_csv = os.path.join(source, "plot.csv")
+                parent_csv = os.path.join(source, "../plot.csv")
+                source = direct_csv if os.path.exists(direct_csv) else parent_csv
+            return pd.read_csv(source, index_col="Nodes")
+
+        if not experiments:
+            raise ValueError("Informe experiments no formato [(plot_csv_ou_diretorio, label), ...].")
+
+        dfs = [(self._filter_nodes(_load_plot_csv(path), nodes_filter), label)
+               for path, label in experiments]
+        all_nodes = dfs[0][0].index.tolist()
+        if not all_nodes:
+            raise ValueError("Nenhuma configuracao de nodes encontrada para o filtro informado.")
+
+        def _mpi_processes_from_node(node):
+            try:
+                return max(float(node), 1.0)
+            except (TypeError, ValueError):
+                digits = "".join(ch for ch in str(node) if ch.isdigit() or ch == ".")
+                return max(float(digits), 1.0) if digits else 1.0
+
+        def _format_seconds(value):
+            value = float(value)
+            if value >= 100:
+                return f"{value:.0f}s"
+            if value >= 10:
+                return f"{value:.1f}s"
+            if value >= 1:
+                return f"{value:.2f}s"
+            return f"{value:.3f}s"
+
+        rows = []
+        for df, label in dfs:
+            df_plot = df.reindex(all_nodes).fillna(0)
+            for node, row in df_plot.iterrows():
+                mpi_processes = _mpi_processes_from_node(node)
+                estimated_total_times = np.array([
+                    float(row[col]) * count for col, count in zip(block_cols, block_counts)
+                ])
+                estimated_times_per_process = estimated_total_times / mpi_processes
+                total_time = estimated_times_per_process.sum()
+                impacts = (estimated_times_per_process / total_time * 100) if total_time > 0 else np.zeros(len(block_labels))
+                for category, count, avg_col, est_total_time, est_time, impact in zip(
+                        block_labels, block_counts, block_cols,
+                        estimated_total_times, estimated_times_per_process, impacts):
+                    rows.append({
+                        "Experimento": label,
+                        "Nodes": node,
+                        "Processos_MPI": mpi_processes,
+                        "Categoria": category,
+                        "Mensagens": count,
+                        "Avg_time_record_s": float(row[avg_col]),
+                        "Tempo_E/S_estimado_total_s": est_total_time,
+                        "Tempo_E/S_estimado_s": est_time,
+                        "Impacto_tempo_pct": impact,
+                    })
+
+        df_metrics = pd.DataFrame(rows)
+
+        n_nodes = len(all_nodes)
+        n_exp = len(dfs)
+        bar_w = min(0.32, 0.75 / n_exp)
+        X = np.arange(n_nodes)
+
+        fig_h = 7.5
+        fig, ax = plt.subplots(figsize=(max(10, n_nodes * n_exp * 1.15), fig_h))
+
+        total_by_exp = {}
+        for _, label in dfs:
+            totals = []
+            for node in all_nodes:
+                rows_node = df_metrics[
+                    (df_metrics["Experimento"] == label) &
+                    (df_metrics["Nodes"] == node)
+                ]
+                totals.append(rows_node["Tempo_E/S_estimado_s"].sum())
+            total_by_exp[label] = np.array(totals)
+
+        max_total = max(
+            (float(totals.max()) for totals in total_by_exp.values() if len(totals)),
+            default=0
+        )
+        label_gap = max_total * 0.035 if max_total > 0 else 1
+        max_label_rows = 1
+
+        for j, (_, label) in enumerate(dfs):
+            bar_x = X + (j - (n_exp - 1) / 2) * bar_w
+            bottoms = np.zeros(n_nodes)
+            small_label_counts = np.zeros(n_nodes, dtype=int)
+            hatch = exp_hatches[j % len(exp_hatches)]
+
+            for category, color in zip(block_labels, block_colors):
+                values = []
+                impacts = []
+                for node in all_nodes:
+                    row = df_metrics[
+                        (df_metrics["Experimento"] == label) &
+                        (df_metrics["Nodes"] == node) &
+                        (df_metrics["Categoria"] == category)
+                    ].iloc[0]
+                    values.append(row["Tempo_E/S_estimado_s"])
+                    impacts.append(row["Impacto_tempo_pct"])
+
+                values = np.array(values)
+                ax.bar(bar_x, values, bar_w, bottom=bottoms,
+                       color=color, edgecolor="#555", linewidth=0.35,
+                       hatch=hatch, label=category if j == 0 else "_nolegend_")
+
+                for i, (x, bottom, value, impact) in enumerate(zip(bar_x, bottoms, values, impacts)):
+                    if value > 0 and impact >= small_segment_pct:
+                        ax.text(x, bottom + value / 2, _format_seconds(value),
+                                ha="center", va="center", fontsize=7.5,
+                                fontweight="bold", color="white")
+                    elif show_small_labels and value > 0:
+                        label_row = small_label_counts[i]
+                        total = total_by_exp[label][i]
+                        x_text = x + ((label_row % 2) - 0.5) * bar_w * 0.55
+                        y_text = total + (label_row + 1) * label_gap
+                        ax.text(x_text, y_text, _format_seconds(value),
+                                ha="center", va="bottom", fontsize=7.5,
+                                fontweight="bold", color=color)
+                        small_label_counts[i] += 1
+
+                bottoms += values
+
+            max_label_rows = max(max_label_rows, int(small_label_counts.max()) + 2)
+        ax.set_ylabel("Tempo de E/S estimado por processo MPI (s)")
+        if plotLabel:
+            ax.set_title(f"Impacto estimado de E/S - {plotLabel}")
+        ax.set_xticks(X)
+        ax.set_xticklabels([f"{node} Nodes" for node in all_nodes], rotation=25, ha="right", fontsize=11)
+        y_margin = max_label_rows * label_gap if show_small_labels else max_total * 0.06
+        ax.set_ylim(0, max_total + y_margin if max_total > 0 else 1)
+        ax.grid(True, axis="y", linestyle="--", alpha=0.35)
+
+        from matplotlib.patches import Patch
+        cat_h = [Patch(facecolor=c, edgecolor="#555", label=l)
+                 for c, l in zip(block_colors, block_labels)]
+        exp_h = [Patch(facecolor="#ddd", edgecolor="#555",
+                       hatch=exp_hatches[j % len(exp_hatches)], label=label)
+                 for j, (_, label) in enumerate(dfs)]
+        ax.legend(handles=cat_h + exp_h, loc="upper left",
+                  fontsize=9, framealpha=0.9, ncol=2)
+
+        plt.tight_layout()
+        plt.show()
+        return df_metrics
+
     def PlotHistogram(self,max_size_kb=0):
 
         labels = ["Até 1 KB", "Até 128 KB", "Até 1 MB", "Até 50 MB"]
