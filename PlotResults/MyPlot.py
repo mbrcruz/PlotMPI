@@ -585,11 +585,6 @@ class MyPlot(object):
         seg_colors      = ['#4caf50', '#1976d2', '#e57373', '#fbc02d']
         seg_labels_txt  = ['Computação', 'Comunicação', 'E/S', 'Coletiva MPI']
         exp_hatches     = ['', '///']
-        dark_bg         = {'#1976d2'}
-
-        def _format_seconds(value):
-            return f"{int(round(float(value))):,}".replace(",", " ") + " s"
-
         def _col(df, *names):
             """Retorna df[name] para o primeiro nome encontrado nas colunas."""
             for name in names:
@@ -636,20 +631,12 @@ class MyPlot(object):
         X          = np.arange(n_nodes) * (n_exp * bar_w + grp_gap)
 
         global_max    = max(float(t.max()) for _, _, _, t, _ in loaded)
-        # Thresholds baseados no percentual da própria barra (pct),
-        # não no valor absoluto — assim segmentos grandes em barras curtas
-        # (ex: 32 nós) também recebem o label completo.
-        PCT_LARGE = 12.0   # pct >= 12% → tempo dentro da pilha
-
         legend_mask = [
             any(np.any(loaded[j][1][s] > 0) for j in range(n_exp))
             for s in range(len(seg_labels_txt))
         ]
 
         fig, ax = plt.subplots(figsize=(max(10, n_nodes * (n_exp * bar_w + grp_gap) * 2.2), 9.5))
-        total_label_offset = max(global_max * 0.018, 1.0)
-        total_label_tops = []
-
         for j, ((_, exp_label), (nodes, seg_v, seg_s, total, total_std)) in enumerate(
                 zip(experiments, loaded)):
             hatch  = exp_hatches[j % len(exp_hatches)]
@@ -663,34 +650,16 @@ class MyPlot(object):
                        color=color, edgecolor='white', linewidth=0.5,
                        hatch=hatch, label=lbl)
 
-                for i in range(n_nodes):
-                    if vals[i] <= 0:
-                        continue
-                    pct = vals[i] / total[i] * 100 if total[i] > 0 else 0
-                    cy  = bots[i] + vals[i] / 2
-                    if pct >= PCT_LARGE:
-                        # Segmento grande: apenas o tempo dentro da pilha.
-                        tc = 'white' if color in dark_bg else 'black'
-                        ax.text(bar_x[i], cy, _format_seconds(vals[i]),
-                                ha='center', va='center',
-                                fontsize=8.5, fontweight='bold', color=tc,
-                                clip_on=True, zorder=10)
                 bots += vals
 
             ax.errorbar(bar_x, total, yerr=total_std,
                         fmt='none', ecolor='#333',
                         elinewidth=1.25, capthick=1.25,
                         capsize=4, zorder=11, clip_on=True)
-            for x, total_v, total_s in zip(bar_x, total, total_std):
-                label_y = total_v + max(float(total_s), 0.0) + total_label_offset
-                ax.text(x, label_y, _format_seconds(total_v),
-                        ha='center', va='bottom',
-                        fontsize=8.5, fontweight='bold',
-                        color='black', zorder=12)
-                total_label_tops.append(label_y + total_label_offset)
-
         # ── Eixos ─────────────────────────────────────────────────────────────
-        ylim_top = max(global_max * 1.15, max(total_label_tops, default=global_max * 1.15))
+        global_errmax = max(float((t + np.nan_to_num(ts, nan=0.0)).max())
+                            for _, _, _, t, ts in loaded)
+        ylim_top = max(global_max, global_errmax) * 1.15
         ax.set_ylim(0, ylim_top)
         ax.set_xticks(X)
         ax.set_xticklabels([f'{nd} nós' for nd in all_nodes])
