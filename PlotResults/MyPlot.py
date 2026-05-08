@@ -694,7 +694,7 @@ class MyPlot(object):
         ax.set_ylim(0, ylim_top)
         ax.set_xticks(X)
         ax.set_xticklabels([f'{nd} nós' for nd in all_nodes])
-        ax.set_ylabel('Tempo médio por processo (s)')
+        ax.set_ylabel('Tempo médio de execução (s)')
         ax.grid(True, axis='y', linestyle='--', alpha=0.3)
 
         # ── Legenda ───────────────────────────────────────────────────────────
