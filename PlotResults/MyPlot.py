@@ -672,8 +672,13 @@ class MyPlot(object):
         exp_h = [Patch(facecolor='#ddd', edgecolor='#555',
                        hatch=exp_hatches[j % len(exp_hatches)], label=lbl)
                  for j, (_, lbl) in enumerate(experiments)]
-        ax.legend(handles=seg_h + exp_h,
-                  loc='upper right', fontsize=8, framealpha=0.9, ncol=2)
+        cat_legend = ax.legend(handles=seg_h, title='Categoria',
+                               loc='upper left', fontsize=8, title_fontsize=8,
+                               framealpha=0.9, ncol=2)
+        ax.add_artist(cat_legend)
+        ax.legend(handles=exp_h, title='Implementação',
+                  loc='upper right', fontsize=8, title_fontsize=8,
+                  framealpha=0.9)
 
         plt.tight_layout()
         plt.show()
