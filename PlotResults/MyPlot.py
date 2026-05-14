@@ -191,8 +191,8 @@ class MyPlot(object):
         
     
         #avg_simulation = statistics.mean(self.Simulations)
-        avg_simulation = df_simulation.groupby("experiment")["hourly_simulation"].mean().mean()         
-        stdev_simulation  = df_simulation.groupby("experiment")["hourly_simulation"].mean().std()
+        avg_simulation = df_simulation.groupby("experiment")["simulation"].mean().mean()         
+        stdev_simulation  = df_simulation.groupby("experiment")["simulation"].mean().std()
         
 
         Avg_comunication_per_process = df_simulation.groupby("experiment")["comunication"].mean().mean()   
@@ -604,16 +604,10 @@ class MyPlot(object):
             std_comm   = _col(df, 'std_comunication_per_process')
             std_coll   = _col(df, 'std_mpiCollective_per_process',
                                    'std_mpiopen_per_process')
-            avg_comp   = np.maximum(avg_sim - avg_io - avg_coll, 0)
-            std_comp   = np.sqrt(np.maximum(std_sim**2 - std_io**2 - std_coll**2, std_sim))
-
-            total      = avg_comp + avg_comm + avg_io + avg_coll
-            total_std  = np.sqrt(np.sum(np.square([
-                np.nan_to_num(std_comp, nan=0.0),
-                np.nan_to_num(std_comm, nan=0.0),
-                np.nan_to_num(std_io, nan=0.0),
-                np.nan_to_num(std_coll, nan=0.0),
-            ]), axis=0))
+            avg_comp   = np.maximum(avg_sim - avg_comm - avg_io - avg_coll, 0)
+            std_comp   = np.sqrt(np.maximum(std_sim**2 - std_io**2 - std_coll**2 - std_comm**2, std_sim))
+            total      = avg_sim
+            total_std  = std_sim
             return (df.index.tolist(),
                     [avg_comp, avg_comm, avg_io, avg_coll],
                     [std_comp, std_comm, std_io, std_coll],
