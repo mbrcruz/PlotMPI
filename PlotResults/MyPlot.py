@@ -129,11 +129,19 @@ class MyPlot(object):
                             simulation["simulation"]= float(self.df_times.iloc[k,1])
                         if  self.df_times.iloc[k,0] == "Hourly simulation":
                             simulation["hourly_simulation"]= float(self.df_times.iloc[k,1])
+                    _exp_dir = os.path.join(self.base_directory, str(experiment+1))
                     simulation["comunication"] = simulation["simulation"] - simulation["hourly_simulation"]
+                    _wait_path = os.path.join(_exp_dir, f"mpiio-{rank}-wait.log")
+                    if os.path.exists(_wait_path):
+                        # colunas: [rank, stage, wait_time]
+                        df_wait = pd.read_csv(_wait_path, header=None)
+                        if df_wait.shape[1] >= 3:
+                            simulation["comunication"] += pd.to_numeric(
+                                df_wait.iloc[:, 2], errors="coerce"
+                            ).sum()
                     self.Simulations.append(simulation)
 
                     # load mpi collective times — tenta os dois padrões de nome
-                    _exp_dir = os.path.join(self.base_directory, str(experiment+1))
                     _collective_path = os.path.join(_exp_dir, f"mpiio-collective-{rank}.log")
                     _open_path       = os.path.join(_exp_dir, f"mpiio-open-{rank}.log")
                     if os.path.exists(_collective_path):
