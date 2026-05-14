@@ -64,6 +64,12 @@ class MyPlot(object):
             self.colors[k]='#{:06x}'.format(random.randint(0, 0xFFFFFF))            
         return self.colors[k]
 
+    def _confidence_interval_95(self, values):
+        values = pd.Series(values, dtype="float64").dropna()
+        if len(values) < 2:
+            return 0.0
+        return 1.96 * values.std(ddof=1) / np.sqrt(len(values))
+
     def load_data(self,filter_scenario=0,filter_experiment=0,number_experiments=5,min_size=0,max_size=0):
 
         if ( not self.typeEvaluation == TypeEvaluation.JUST_COMUNICATION 
@@ -189,8 +195,9 @@ class MyPlot(object):
         #record_por_cenarios= df[~df["scenario"].isin(self.badScenarios)].groupby("scenario")["timeSec"].size().reset_index(name="num_registros").sort_values("num_registros", ascending=False)            
         # record_por_cenarios= ~df.isin(self.badScenarios).size()
         #print(record_por_cenarios)                
-        avg_time_per_scenario=  sum_scenarios.groupby("experiment").mean().mean()       
-        stdev_time_per_scenario = sum_scenarios.groupby("experiment").mean().std()        
+        mean_time_per_scenario_by_exp = sum_scenarios.groupby("experiment").mean()
+        avg_time_per_scenario=  mean_time_per_scenario_by_exp.mean()       
+        stdev_time_per_scenario = self._confidence_interval_95(mean_time_per_scenario_by_exp)        
 
         self.worstScenario= sum_scenarios.idxmax()
         self.bestScenario= sum_scenarios.idxmin()
@@ -199,22 +206,24 @@ class MyPlot(object):
         
     
         #avg_simulation = statistics.mean(self.Simulations)
-        avg_simulation = df_simulation.groupby("experiment")["simulation"].mean().mean()         
-        stdev_simulation  = df_simulation.groupby("experiment")["simulation"].mean().std()
+        mean_simulation_by_exp = df_simulation.groupby("experiment")["simulation"].mean()
+        avg_simulation = mean_simulation_by_exp.mean()         
+        stdev_simulation  = self._confidence_interval_95(mean_simulation_by_exp)
         
 
-        Avg_comunication_per_process = df_simulation.groupby("experiment")["comunication"].mean().mean()   
-        stdev_comunication_per_process =df_simulation.groupby("experiment")["comunication"].mean().std()
+        mean_comunication_by_exp = df_simulation.groupby("experiment")["comunication"].mean()
+        Avg_comunication_per_process = mean_comunication_by_exp.mean()   
+        stdev_comunication_per_process = self._confidence_interval_95(mean_comunication_by_exp)
 
         print(f'Avg Comunication per Process(s): {Avg_comunication_per_process}')
-        print(f'StdDev Comunication per Process(s): {stdev_comunication_per_process}')
+        print(f'CI95 Comunication per Process(s): {stdev_comunication_per_process}')
 
         #Falta desvio padrao de comunicacao por processo
         print(f'Avg Simulation per Process(s): {avg_simulation}') 
-        print(f'StdDev Simulation per Process(s): {stdev_simulation}') 
+        print(f'CI95 Simulation per Process(s): {stdev_simulation}') 
         #print(f'Number Buffers: {self.records.count}')                
         print(f'AVG per Scenarios: {avg_time_per_scenario}')        
-        print(f'Stdev per Scenarios: {stdev_time_per_scenario}')  
+        print(f'CI95 per Scenarios: {stdev_time_per_scenario}')  
         print(f'Max per Scenarios: {self.worstScenario} {max_time_per_scenario}') 
         print(f'Min per Scenarios: {self.bestScenario} {min_time_per_scenario}') 
 
@@ -230,43 +239,48 @@ class MyPlot(object):
         
         if len(self.records1) >0:
             Size_time_per_record1 = df1["timeSec"].count()/ 5
-            Avg_time_per_record1 = df1.groupby("experiment")["timeSec"].mean().mean()
-            Stdev_time_per_record1= df1.groupby("experiment")["timeSec"].mean().std()
+            mean_time_per_record1_by_exp = df1.groupby("experiment")["timeSec"].mean()
+            Avg_time_per_record1 = mean_time_per_record1_by_exp.mean()
+            Stdev_time_per_record1= self._confidence_interval_95(mean_time_per_record1_by_exp)
             print(f'Count per record1 < {self.categories[0]} MB: {Size_time_per_record1}')
             print(f'AVG per record1 < {self.categories[0]} MB: {Avg_time_per_record1}') 
-            print(f'Stdev per record1 < {self.categories[0]} MB: {Stdev_time_per_record1}')
+            print(f'CI95 per record1 < {self.categories[0]} MB: {Stdev_time_per_record1}')
 
         if len(self.records2) >0:
             Size_time_per_record2 = df2["timeSec"].count()/ 5 
-            Avg_time_per_record2 = df2.groupby("experiment")["timeSec"].mean().mean()
-            Stdev_time_per_record2= df2.groupby("experiment")["timeSec"].mean().std()
+            mean_time_per_record2_by_exp = df2.groupby("experiment")["timeSec"].mean()
+            Avg_time_per_record2 = mean_time_per_record2_by_exp.mean()
+            Stdev_time_per_record2= self._confidence_interval_95(mean_time_per_record2_by_exp)
             print(f'Count per record2 < {self.categories[1]} MB: {Size_time_per_record2}')  
             print(f'AVG per record2 < {self.categories[1]} MB: {Avg_time_per_record2}') 
-            print(f'Stdev per record2 < {self.categories[1]} MB: {Stdev_time_per_record2}')
+            print(f'CI95 per record2 < {self.categories[1]} MB: {Stdev_time_per_record2}')
 
         if len(self.records3) > 0:
             Size_time_per_record3 = df3["timeSec"].count()/ 5
-            Avg_time_per_record3 = df3.groupby("experiment")["timeSec"].mean().mean()
-            Stdev_time_per_record3= df3.groupby("experiment")["timeSec"].mean().std()
+            mean_time_per_record3_by_exp = df3.groupby("experiment")["timeSec"].mean()
+            Avg_time_per_record3 = mean_time_per_record3_by_exp.mean()
+            Stdev_time_per_record3= self._confidence_interval_95(mean_time_per_record3_by_exp)
             print(f'Count per record3 < {self.categories[2]} MB: {Size_time_per_record3}')
             print(f'AVG per record3 < {self.categories[2]} MB: {Avg_time_per_record3}') 
-            print(f'Stdev per record3 < {self.categories[2]} MB: {  Stdev_time_per_record3}')
+            print(f'CI95 per record3 < {self.categories[2]} MB: {  Stdev_time_per_record3}')
         if len(self.records4) > 0:
             Size_time_per_record4 = df4["timeSec"].count()/ 5
-            Avg_time_per_record4 = df4.groupby("experiment")["timeSec"].mean().mean()
-            Stdev_time_per_record4= df4.groupby("experiment")["timeSec"].mean().std()
+            mean_time_per_record4_by_exp = df4.groupby("experiment")["timeSec"].mean()
+            Avg_time_per_record4 = mean_time_per_record4_by_exp.mean()
+            Stdev_time_per_record4= self._confidence_interval_95(mean_time_per_record4_by_exp)
             print(f'Count per record4 >= {self.categories[2]} MB: {Size_time_per_record4}')
             print(f'AVG per record4 >= {self.categories[2]} MB: {Avg_time_per_record4}') 
-            print(f'Stdev per record4 >= {self.categories[2]} MB: {Stdev_time_per_record4}')
+            print(f'CI95 per record4 >= {self.categories[2]} MB: {Stdev_time_per_record4}')
 
         
         #sum_time= sum(self.diffs)
         #Calcula o tempo medio de cada cenario e depois multiplica pelo numero de cenario executado por processo.
-        Avg_io_per_process = df.groupby(["experiment","rank"])["timeSec"].sum().mean()        
-        std_io_per_process = df.groupby(["experiment","rank"])["timeSec"].sum().std()        
+        sum_io_by_process = df.groupby(["experiment","rank"])["timeSec"].sum()
+        Avg_io_per_process = sum_io_by_process.mean()        
+        std_io_per_process = self._confidence_interval_95(sum_io_by_process)        
         # # Average time per process)
         print(f'Avg IO per Process(s): {Avg_io_per_process}') 
-        print(f'Std IO per Process(s): {std_io_per_process}') 
+        print(f'CI95 IO per Process(s): {std_io_per_process}') 
         
         
      
@@ -285,20 +299,20 @@ class MyPlot(object):
             results_bw.append({
                 "experiment": exp,
                 "mean_bw": bw_per_window.mean(),
-                "std_bw": bw_per_window.std(ddof=1) if len(bw_per_window) > 1 else 0.0
+                "std_bw": self._confidence_interval_95(bw_per_window)
             })
         df_bw = pd.DataFrame(results_bw).set_index("experiment")
         print(f"Banda agregada por experimento (janelas de {WINDOW_SEC}s):")
         for exp, row in df_bw.iterrows():
             print(f'  Experimento {exp}: {row["mean_bw"]:.2f} ± {row["std_bw"]:.2f} Gb/s')
         avg_agregate_bandwidth = df_bw["mean_bw"].mean()
-        stddev_bandwidth       = df_bw["mean_bw"].std(ddof=1) if len(df_bw) > 1 else 0.0
+        stddev_bandwidth       = self._confidence_interval_95(df_bw["mean_bw"])
         agrupados = df.groupby(["experiment","rank"])[["sizeBytes","timeSec"]].sum()
         size_por_rank = agrupados["sizeBytes"].mean() / 1e9  # em GB
         total_size_per_nodes = size_por_rank * self.number_scenarios_per_nodes  # em GB
         print(f'Total Size per Node (GB): {total_size_per_nodes:.2f}')
         print(f'AVG Aggregate Bandwidth (Gb/s): {avg_agregate_bandwidth:.2f}')
-        print(f'Stdev Aggregate Bandwidth (Gb/s): {stddev_bandwidth:.2f}')
+        print(f'CI95 Aggregate Bandwidth (Gb/s): {stddev_bandwidth:.2f}')
 
 
         if self.df_mpiCollective is None:
@@ -307,11 +321,12 @@ class MyPlot(object):
             stdev_mpiopen=0
         else:
             sum_mpiCollective= self.df_mpiCollective.groupby(["experiment","rank"])["timeSec"].sum()
-            avg_mpiCollective = sum_mpiCollective.groupby("experiment").mean().mean()
-            stdev_mpiCollective = sum_mpiCollective.groupby("experiment").mean().std()
+            mean_mpiCollective_by_exp = sum_mpiCollective.groupby("experiment").mean()
+            avg_mpiCollective = mean_mpiCollective_by_exp.mean()
+            stdev_mpiCollective = self._confidence_interval_95(mean_mpiCollective_by_exp)
               
         print(f'AVG MPIOpen (s): {avg_mpiCollective:.2f}')        
-        print(f'Stdev MPIOpen (s)): {stdev_mpiCollective:.2f}')  
+        print(f'CI95 MPIOpen (s)): {stdev_mpiCollective:.2f}')  
         
         if not desabilitaEscreverCsv:
             print("Writing CSV file...")
