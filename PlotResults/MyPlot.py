@@ -41,6 +41,7 @@ class MyPlot(object):
         self.Simulations=[]
         self.df_mpiCollective=[]
         self.mpiCollective=[]
+        self.ioExtra=[]   # tempos de wait/test: {"experiment", "rank", "timeSec"}
         self.localScenarios=[]   
         self.bestScenario=0
         self.worstScenario=0 
@@ -137,15 +138,25 @@ class MyPlot(object):
                             simulation["hourly_simulation"]= float(self.df_times.iloc[k,1])
                     _exp_dir = os.path.join(self.base_directory, str(experiment+1))
                     simulation["comunication"] = simulation["simulation"] - simulation["hourly_simulation"]
-                    _wait_path = os.path.join(_exp_dir, f"mpiio-{rank}-wait.log")
-                    if os.path.exists(_wait_path):
-                        # colunas: [rank, stage, wait_time]
-                        df_wait = pd.read_csv(_wait_path, header=None)
-                        if df_wait.shape[1] >= 3:
-                            simulation["comunication"] += pd.to_numeric(
-                                df_wait.iloc[:, 2], errors="coerce"
-                            ).sum()
                     self.Simulations.append(simulation)
+
+                    # Arquivos auxiliares de E/S: formato rank,scenario,tempo_acumulado
+                    # Não têm timestamps nem tamanho — armazenados separadamente em ioExtra
+                    if not (self.onlyRemote and i < self.number_scenarios_per_nodes):
+                        for _suffix in ("wait", "test"):
+                            _aux_path = os.path.join(_exp_dir, f"mpiio-{rank}-{_suffix}.log")
+                            if not os.path.exists(_aux_path):
+                                continue
+                            df_aux = pd.read_csv(_aux_path, header=None)
+                            for k in range(len(df_aux)):
+                                scenario = df_aux.iloc[k, 1]
+                                t_acc    = float(df_aux.iloc[k, 2])
+                                if filter_scenario == 0 or scenario == filter_scenario:
+                                    self.ioExtra.append({
+                                        "experiment": experiment + 1,
+                                        "rank": rank,
+                                        "timeSec": t_acc,
+                                    })
 
                     # load mpi collective times — tenta os dois padrões de nome
                     _collective_path = os.path.join(_exp_dir, f"mpiio-collective-{rank}.log")
@@ -276,11 +287,18 @@ class MyPlot(object):
         #sum_time= sum(self.diffs)
         #Calcula o tempo medio de cada cenario e depois multiplica pelo numero de cenario executado por processo.
         sum_io_by_process = df.groupby(["experiment","rank"])["timeSec"].sum()
-        Avg_io_per_process = sum_io_by_process.mean()        
-        std_io_per_process = self._confidence_interval_95(sum_io_by_process)        
-        # # Average time per process)
-        print(f'Avg IO per Process(s): {Avg_io_per_process}') 
-        print(f'CI95 IO per Process(s): {std_io_per_process}') 
+        # Adiciona tempos de wait/test (ioExtra) ao I/O por processo
+        if self.ioExtra:
+            df_extra = pd.DataFrame(self.ioExtra)
+            sum_extra = df_extra.groupby(["experiment","rank"])["timeSec"].sum()
+            mean_ioextra_by_exp = sum_extra.groupby("experiment").mean()
+            avg_ioextra_all_experiments = mean_ioextra_by_exp.mean()
+            print(f'Avg IOExtra across Experiments(s): {avg_ioextra_all_experiments}')
+            sum_io_by_process = sum_io_by_process.add(sum_extra, fill_value=0)
+        Avg_io_per_process = sum_io_by_process.mean()
+        std_io_per_process = self._confidence_interval_95(sum_io_by_process)
+        print(f'Avg IO per Process(s): {Avg_io_per_process}')
+        print(f'CI95 IO per Process(s): {std_io_per_process}')
         
         
      
