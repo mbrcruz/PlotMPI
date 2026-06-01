@@ -339,9 +339,7 @@ class MyPlot(object):
             stdev_mpiopen=0
         else:
             sum_mpiCollective= self.df_mpiCollective.groupby(["experiment","rank"])["timeSec"].sum()
-            # Coletivas são barreiras: todos os ranks esperam pelo mais lento.
-            # O custo real por experimento é o máximo entre ranks, não a média.
-            mean_mpiCollective_by_exp = sum_mpiCollective.groupby("experiment").max()
+            mean_mpiCollective_by_exp = sum_mpiCollective.groupby("experiment").mean()
             avg_mpiCollective = mean_mpiCollective_by_exp.mean()
             stdev_mpiCollective = self._confidence_interval_95(mean_mpiCollective_by_exp)
               
@@ -648,7 +646,7 @@ class MyPlot(object):
             std_coll   = _col(df, 'std_mpiCollective_per_process',
                                    'std_mpiopen_per_process')
             avg_comp   = np.maximum(avg_sim - avg_comm - avg_io - avg_coll, 0)
-            std_comp   = np.sqrt(np.maximum(std_sim**2 - std_io**2 - std_coll**2 - std_comm**2, 0))
+            std_comp   = np.sqrt(np.maximum(std_sim**2 - std_io**2 - std_coll**2 - std_comm**2, std_sim))
             total      = avg_sim
             total_std  = std_sim
             return (df.index.tolist(),
