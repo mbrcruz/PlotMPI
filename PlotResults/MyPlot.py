@@ -397,7 +397,7 @@ class MyPlot(object):
         filtered_nodes = [node for node in nodes_filter if node in df.index]
         return df.reindex(filtered_nodes)
             
-    def plotBandwidth(self, experiments, plotLabel, nodes_filter=None):
+    def plotBandwidth(self, experiments, plotLabel, nodes_filter=None, implementation_formats=None):
         """
         Banda agregada por configuração de nós, comparando múltiplos experimentos.
 
@@ -405,7 +405,13 @@ class MyPlot(object):
             Ex: [(r"...\\plot.csv", "Original"), (r"...\\plot.csv", "MPI-IO")]
         """
         bandwidth_color = '#e57373'
-        exp_hatches = ['', '///', '...', 'xxx']
+        hatch_by_format = {
+            0: '',
+            1: '///',
+            2: '---',
+        }
+        if implementation_formats is None:
+            implementation_formats = [0, 1]
 
         # Carrega todos os CSVs
         dfs = [(self._filter_nodes(pd.read_csv(p, index_col='Nodes'), nodes_filter), lbl) for p, lbl in experiments]
@@ -421,7 +427,10 @@ class MyPlot(object):
 
         for j, (df, lbl) in enumerate(dfs):
             color   = bandwidth_color
-            hatch   = exp_hatches[j % len(exp_hatches)]
+            implementation_format = implementation_formats[j % len(implementation_formats)]
+            hatch   = hatch_by_format.get(implementation_format)
+            if hatch is None:
+                raise ValueError(f"Formato de implementaÃ§Ã£o invÃ¡lido: {implementation_format}. Use 0, 1 ou 2.")
             bar_x   = X + (j - (n_exp - 1) / 2) * bar_w
             df_plot = df.reindex(all_nodes).fillna(0)
             avg_bw  = df_plot['Avg_bandwidth'].values
@@ -475,7 +484,7 @@ class MyPlot(object):
         plt.show()
 
     
-    def plotBlocks(self, experiments, plotLabel, nodes_filter=None, number_blocks=4):
+    def plotBlocks(self, experiments, plotLabel, nodes_filter=None, number_blocks=4, implementation_formats=None):
         """
         Tempo médio por categoria de tamanho de mensagem, comparando experimentos.
 
@@ -501,7 +510,13 @@ class MyPlot(object):
             ('Avg_time_per_record3', 'Stdev_time_per_record3'),
             ('Avg_time_per_record4', 'Stdev_time_per_record4'),
         ]
-        exp_hatches = ['', '///']
+        hatch_by_format = {
+            0: '',
+            1: '///',
+            2: '---',
+        }
+        if implementation_formats is None:
+            implementation_formats = [0, 1]
         y_min = 1e-5
 
         if isinstance(nodes_filter, (int, np.integer)):
@@ -556,7 +571,10 @@ class MyPlot(object):
                 upper_err = std_v
                 yerr = np.vstack([lower_err, upper_err])
                 bar_x = X + (j - (n_exp - 1) / 2) * bar_w
-                hatch = exp_hatches[j % len(exp_hatches)]
+                implementation_format = implementation_formats[j % len(implementation_formats)]
+                hatch = hatch_by_format.get(implementation_format)
+                if hatch is None:
+                    raise ValueError(f"Formato de implementaÃ§Ã£o invÃ¡lido: {implementation_format}. Use 0, 1 ou 2.")
 
                 ax_cat.bar(
                     bar_x, avg_v, bar_w,
@@ -596,7 +614,7 @@ class MyPlot(object):
         cat_h = [Patch(facecolor=c, edgecolor='#555', label=l)
                  for c, l in zip(block_colors[:n_blocks], block_labels[:n_blocks])]
         exp_h = [Patch(facecolor='#ddd', edgecolor='#555',
-                       hatch=exp_hatches[j % len(exp_hatches)], label=lbl)
+                       hatch=hatch_by_format[implementation_formats[j % len(implementation_formats)]], label=lbl)
                  for j, (_, lbl) in enumerate(experiments)]
 
         fig.legend(handles=cat_h, title='Categoria',
@@ -1080,7 +1098,7 @@ class MyPlot(object):
 
             if size_bytes <= 1024:
                 counts[0] += 1
-            elif size_bytes <= 128 * 1024:
+            elif size_bytes <= 32 * 1024:
                 counts[1] += 1
             elif size_bytes <= 1024 * 1024:
                 counts[2] += 1
