@@ -67,9 +67,37 @@ class MyPlot(object):
 
     def _confidence_interval_95(self, values):
         values = pd.Series(values, dtype="float64").dropna()
+        n = len(values)
+        if n < 2:
+            return 0.0
+        df = n - 1
+        try:
+            from scipy.stats import t
+            t_critical = t.ppf(0.975, df)
+        except ImportError:
+            t_critical_by_df = {
+                1: 12.706, 2: 4.303, 3: 3.182, 4: 2.776, 5: 2.571,
+                6: 2.447, 7: 2.365, 8: 2.306, 9: 2.262, 10: 2.228,
+                11: 2.201, 12: 2.179, 13: 2.160, 14: 2.145, 15: 2.131,
+                16: 2.120, 17: 2.110, 18: 2.101, 19: 2.093, 20: 2.086,
+                21: 2.080, 22: 2.074, 23: 2.069, 24: 2.064, 25: 2.060,
+                26: 2.056, 27: 2.052, 28: 2.048, 29: 2.045, 30: 2.042,
+                40: 2.021, 60: 2.000, 80: 1.990, 100: 1.984, 120: 1.980,
+            }
+            if df in t_critical_by_df:
+                t_critical = t_critical_by_df[df]
+            elif df > max(t_critical_by_df):
+                t_critical = 1.96
+            else:
+                next_df = min(key for key in t_critical_by_df if key > df)
+                t_critical = t_critical_by_df[next_df]
+        return t_critical * values.std(ddof=1) / np.sqrt(n)
+
+    def _sample_stdev(self, values):
+        values = pd.Series(values, dtype="float64").dropna()
         if len(values) < 2:
             return 0.0
-        return 1.96 * values.std(ddof=1) / np.sqrt(len(values))
+        return values.std(ddof=1)
 
     def load_data(self,filter_scenario=0,filter_experiment=0,number_experiments=5,min_size=0,max_size=0):
 
@@ -208,7 +236,8 @@ class MyPlot(object):
         #print(record_por_cenarios)                
         mean_time_per_scenario_by_exp = sum_scenarios.groupby("experiment").mean()
         avg_time_per_scenario=  mean_time_per_scenario_by_exp.mean()       
-        stdev_time_per_scenario = self._confidence_interval_95(mean_time_per_scenario_by_exp)        
+        stdev_time_per_scenario = self._sample_stdev(mean_time_per_scenario_by_exp)
+        ci95_time_per_scenario = self._confidence_interval_95(mean_time_per_scenario_by_exp)
 
         self.worstScenario= sum_scenarios.idxmax()
         self.bestScenario= sum_scenarios.idxmin()
@@ -219,22 +248,27 @@ class MyPlot(object):
         #avg_simulation = statistics.mean(self.Simulations)
         mean_simulation_by_exp = df_simulation.groupby("experiment")["simulation"].mean()
         avg_simulation = mean_simulation_by_exp.mean()         
-        stdev_simulation  = self._confidence_interval_95(mean_simulation_by_exp)
+        stdev_simulation = self._sample_stdev(mean_simulation_by_exp)
+        ci95_simulation = self._confidence_interval_95(mean_simulation_by_exp)
         
 
         mean_comunication_by_exp = df_simulation.groupby("experiment")["comunication"].mean()
         Avg_comunication_per_process = mean_comunication_by_exp.mean()   
-        stdev_comunication_per_process = self._confidence_interval_95(mean_comunication_by_exp)
+        stdev_comunication_per_process = self._sample_stdev(mean_comunication_by_exp)
+        ci95_comunication_per_process = self._confidence_interval_95(mean_comunication_by_exp)
 
         print(f'Avg Comunication per Process(s): {Avg_comunication_per_process}')
-        print(f'CI95 Comunication per Process(s): {stdev_comunication_per_process}')
+        print(f'Stdev Comunication per Process(s): {stdev_comunication_per_process}')
+        print(f'CI95 Comunication per Process(s): {ci95_comunication_per_process}')
 
         #Falta desvio padrao de comunicacao por processo
         print(f'Avg Simulation per Process(s): {avg_simulation}') 
-        print(f'CI95 Simulation per Process(s): {stdev_simulation}') 
+        print(f'Stdev Simulation per Process(s): {stdev_simulation}')
+        print(f'CI95 Simulation per Process(s): {ci95_simulation}') 
         #print(f'Number Buffers: {self.records.count}')                
         print(f'AVG per Scenarios: {avg_time_per_scenario}')        
-        print(f'CI95 per Scenarios: {stdev_time_per_scenario}')  
+        print(f'Stdev per Scenarios: {stdev_time_per_scenario}')
+        print(f'CI95 per Scenarios: {ci95_time_per_scenario}')  
         print(f'Max per Scenarios: {self.worstScenario} {max_time_per_scenario}') 
         print(f'Min per Scenarios: {self.bestScenario} {min_time_per_scenario}') 
 
@@ -247,41 +281,53 @@ class MyPlot(object):
         Stdev_time_per_record3=0
         Avg_time_per_record4=0
         Stdev_time_per_record4=0
+        CI95_time_per_record1=0
+        CI95_time_per_record2=0
+        CI95_time_per_record3=0
+        CI95_time_per_record4=0
         
         if len(self.records1) >0:
             Size_time_per_record1 = df1["timeSec"].count()/ 5
             mean_time_per_record1_by_exp = df1.groupby("experiment")["timeSec"].mean()
             Avg_time_per_record1 = mean_time_per_record1_by_exp.mean()
-            Stdev_time_per_record1= self._confidence_interval_95(mean_time_per_record1_by_exp)
+            Stdev_time_per_record1= self._sample_stdev(mean_time_per_record1_by_exp)
+            CI95_time_per_record1= self._confidence_interval_95(mean_time_per_record1_by_exp)
             print(f'Count per record1 < {self.categories[0]} MB: {Size_time_per_record1}')
             print(f'AVG per record1 < {self.categories[0]} MB: {Avg_time_per_record1}') 
-            print(f'CI95 per record1 < {self.categories[0]} MB: {Stdev_time_per_record1}')
+            print(f'Stdev per record1 < {self.categories[0]} MB: {Stdev_time_per_record1}')
+            print(f'CI95 per record1 < {self.categories[0]} MB: {CI95_time_per_record1}')
 
         if len(self.records2) >0:
             Size_time_per_record2 = df2["timeSec"].count()/ 5 
             mean_time_per_record2_by_exp = df2.groupby("experiment")["timeSec"].mean()
             Avg_time_per_record2 = mean_time_per_record2_by_exp.mean()
-            Stdev_time_per_record2= self._confidence_interval_95(mean_time_per_record2_by_exp)
+            Stdev_time_per_record2= self._sample_stdev(mean_time_per_record2_by_exp)
+            CI95_time_per_record2= self._confidence_interval_95(mean_time_per_record2_by_exp)
             print(f'Count per record2 < {self.categories[1]} MB: {Size_time_per_record2}')  
             print(f'AVG per record2 < {self.categories[1]} MB: {Avg_time_per_record2}') 
-            print(f'CI95 per record2 < {self.categories[1]} MB: {Stdev_time_per_record2}')
+            print(f'Stdev per record2 < {self.categories[1]} MB: {Stdev_time_per_record2}')
+            print(f'CI95 per record2 < {self.categories[1]} MB: {CI95_time_per_record2}')
 
         if len(self.records3) > 0:
             Size_time_per_record3 = df3["timeSec"].count()/ 5
             mean_time_per_record3_by_exp = df3.groupby("experiment")["timeSec"].mean()
             Avg_time_per_record3 = mean_time_per_record3_by_exp.mean()
-            Stdev_time_per_record3= self._confidence_interval_95(mean_time_per_record3_by_exp)
+            Stdev_time_per_record3= self._sample_stdev(mean_time_per_record3_by_exp)
+            CI95_time_per_record3= self._confidence_interval_95(mean_time_per_record3_by_exp)
             print(f'Count per record3 < {self.categories[2]} MB: {Size_time_per_record3}')
             print(f'AVG per record3 < {self.categories[2]} MB: {Avg_time_per_record3}') 
-            print(f'CI95 per record3 < {self.categories[2]} MB: {  Stdev_time_per_record3}')
+            print(f'Stdev per record3 < {self.categories[2]} MB: {Stdev_time_per_record3}')
+            print(f'CI95 per record3 < {self.categories[2]} MB: {CI95_time_per_record3}')
         if len(self.records4) > 0:
             Size_time_per_record4 = df4["timeSec"].count()/ 5
             mean_time_per_record4_by_exp = df4.groupby("experiment")["timeSec"].mean()
             Avg_time_per_record4 = mean_time_per_record4_by_exp.mean()
-            Stdev_time_per_record4= self._confidence_interval_95(mean_time_per_record4_by_exp)
+            Stdev_time_per_record4= self._sample_stdev(mean_time_per_record4_by_exp)
+            CI95_time_per_record4= self._confidence_interval_95(mean_time_per_record4_by_exp)
             print(f'Count per record4 >= {self.categories[2]} MB: {Size_time_per_record4}')
             print(f'AVG per record4 >= {self.categories[2]} MB: {Avg_time_per_record4}') 
-            print(f'CI95 per record4 >= {self.categories[2]} MB: {Stdev_time_per_record4}')
+            print(f'Stdev per record4 >= {self.categories[2]} MB: {Stdev_time_per_record4}')
+            print(f'CI95 per record4 >= {self.categories[2]} MB: {CI95_time_per_record4}')
 
         
         #sum_time= sum(self.diffs)
@@ -296,9 +342,11 @@ class MyPlot(object):
             print(f'Avg IOExtra across Experiments(s): {avg_ioextra_all_experiments}')
             sum_io_by_process = sum_io_by_process.add(sum_extra, fill_value=0)
         Avg_io_per_process = sum_io_by_process.mean()
-        std_io_per_process = self._confidence_interval_95(sum_io_by_process)
+        std_io_per_process = self._sample_stdev(sum_io_by_process)
+        ci95_io_per_process = self._confidence_interval_95(sum_io_by_process)
         print(f'Avg IO per Process(s): {Avg_io_per_process}')
-        print(f'CI95 IO per Process(s): {std_io_per_process}')
+        print(f'Stdev IO per Process(s): {std_io_per_process}')
+        print(f'CI95 IO per Process(s): {ci95_io_per_process}')
         
         
      
@@ -317,34 +365,40 @@ class MyPlot(object):
             results_bw.append({
                 "experiment": exp,
                 "mean_bw": bw_per_window.mean(),
-                "std_bw": self._confidence_interval_95(bw_per_window)
+                "std_bw": self._sample_stdev(bw_per_window),
+                "ci95_bw": self._confidence_interval_95(bw_per_window)
             })
         df_bw = pd.DataFrame(results_bw).set_index("experiment")
         print(f"Banda agregada por experimento (janelas de {WINDOW_SEC}s):")
         for exp, row in df_bw.iterrows():
-            print(f'  Experimento {exp}: {row["mean_bw"]:.2f} ± {row["std_bw"]:.2f} Gb/s')
+            print(f'  Experimento {exp}: {row["mean_bw"]:.2f} stdev {row["std_bw"]:.2f} CI95 {row["ci95_bw"]:.2f} Gb/s')
         avg_agregate_bandwidth = df_bw["mean_bw"].mean()
-        stddev_bandwidth       = self._confidence_interval_95(df_bw["mean_bw"])
+        stddev_bandwidth = self._sample_stdev(df_bw["mean_bw"])
+        ci95_bandwidth = self._confidence_interval_95(df_bw["mean_bw"])
         agrupados = df.groupby(["experiment","rank"])[["sizeBytes","timeSec"]].sum()
         size_por_rank = agrupados["sizeBytes"].mean() / 1e9  # em GB
         total_size_per_nodes = size_por_rank * self.number_scenarios_per_nodes  # em GB
         print(f'Total Size per Node (GB): {total_size_per_nodes:.2f}')
         print(f'AVG Aggregate Bandwidth (Gb/s): {avg_agregate_bandwidth:.2f}')
-        print(f'CI95 Aggregate Bandwidth (Gb/s): {stddev_bandwidth:.2f}')
+        print(f'Stdev Aggregate Bandwidth (Gb/s): {stddev_bandwidth:.2f}')
+        print(f'CI95 Aggregate Bandwidth (Gb/s): {ci95_bandwidth:.2f}')
 
 
         if self.df_mpiCollective is None:
             avg_mpiCollective= 0
             stdev_mpiCollective= 0
+            ci95_mpiCollective= 0
             stdev_mpiopen=0
         else:
             sum_mpiCollective= self.df_mpiCollective.groupby(["experiment","rank"])["timeSec"].sum()
             mean_mpiCollective_by_exp = sum_mpiCollective.groupby("experiment").mean()
             avg_mpiCollective = mean_mpiCollective_by_exp.mean()
-            stdev_mpiCollective = self._confidence_interval_95(mean_mpiCollective_by_exp)
+            stdev_mpiCollective = self._sample_stdev(mean_mpiCollective_by_exp)
+            ci95_mpiCollective = self._confidence_interval_95(mean_mpiCollective_by_exp)
               
         print(f'AVG MPIOpen (s): {avg_mpiCollective:.2f}')        
-        print(f'CI95 MPIOpen (s)): {stdev_mpiCollective:.2f}')  
+        print(f'Stdev MPIOpen (s): {stdev_mpiCollective:.2f}')
+        print(f'CI95 MPIOpen (s)): {ci95_mpiCollective:.2f}')  
         
         if not desabilitaEscreverCsv:
             print("Writing CSV file...")
@@ -360,7 +414,17 @@ class MyPlot(object):
                                 'Avg_time_per_record3': Avg_time_per_record3 ,'Stdev_time_per_record3': Stdev_time_per_record3,
                                 'Avg_time_per_record4': Avg_time_per_record4 ,'Stdev_time_per_record4': Stdev_time_per_record4,
                                 'Avg_comunication_per_process': Avg_comunication_per_process, 'std_comunication_per_process': stdev_comunication_per_process,
-                                'Avg_mpiCollective_per_process': avg_mpiCollective, 'std_mpiCollective_per_process': stdev_mpiCollective
+                                'Avg_mpiCollective_per_process': avg_mpiCollective, 'std_mpiCollective_per_process': stdev_mpiCollective,
+                                'CI95_simulation': ci95_simulation,
+                                'CI95_io_per_process': ci95_io_per_process,
+                                'CI95_time_per_scenario': ci95_time_per_scenario,
+                                'CI95_bandwidth': ci95_bandwidth,
+                                'CI95_time_per_record1': CI95_time_per_record1,
+                                'CI95_time_per_record2': CI95_time_per_record2,
+                                'CI95_time_per_record3': CI95_time_per_record3,
+                                'CI95_time_per_record4': CI95_time_per_record4,
+                                'CI95_comunication_per_process': ci95_comunication_per_process,
+                                'CI95_mpiCollective_per_process': ci95_mpiCollective
 
                                 } )  
         
@@ -379,9 +443,30 @@ class MyPlot(object):
                      "Avg_time_per_record3", "Stdev_time_per_record3",
                      "Avg_time_per_record4", "Stdev_time_per_record4",
                      "Avg_comunication_per_process", "std_comunication_per_process",
-                     "Avg_mpiCollective_per_process", "std_mpiCollective_per_process"
+                     "Avg_mpiCollective_per_process", "std_mpiCollective_per_process",
+                     "CI95_simulation",
+                     "CI95_io_per_process",
+                     "CI95_time_per_scenario",
+                     "CI95_bandwidth",
+                     "CI95_time_per_record1",
+                     "CI95_time_per_record2",
+                     "CI95_time_per_record3",
+                     "CI95_time_per_record4",
+                     "CI95_comunication_per_process",
+                     "CI95_mpiCollective_per_process"
                      ]
         escrever_cabecalho = not os.path.exists(path_csv) or os.path.getsize(path_csv) == 0
+        if not escrever_cabecalho:
+            with open(path_csv, mode='r', newline='', encoding='utf-8') as arquivo_csv:
+                reader = csv.DictReader(arquivo_csv)
+                linhas_existentes = list(reader)
+                cabecalho_atual = reader.fieldnames
+            if cabecalho_atual != cabecalho:
+                with open(path_csv, mode='w', newline='', encoding='utf-8') as arquivo_csv:
+                    writer = csv.DictWriter(arquivo_csv, fieldnames=cabecalho)
+                    writer.writeheader()
+                    for linha_existente in linhas_existentes:
+                        writer.writerow({campo: linha_existente.get(campo, "") for campo in cabecalho})
         with open(path_csv,mode='a',newline='',encoding='utf-8') as arquivo_csv:
             writer = csv.DictWriter(arquivo_csv, fieldnames=cabecalho)
             if escrever_cabecalho:
