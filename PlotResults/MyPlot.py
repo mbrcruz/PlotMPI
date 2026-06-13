@@ -672,14 +672,6 @@ class MyPlot(object):
 
                 positive_tops = avg_v + std_v
                 category_max = max(category_max, float(np.nanmax(positive_tops)))
-                for x, value, std in zip(bar_x, avg_v, std_v):
-                    label_y = max(value + std, y_min) * 1.18
-                    ax_cat.text(
-                        x, label_y, _format_seconds(value),
-                        ha='center', va='bottom',
-                        fontsize=7.0, fontweight='bold',
-                        color=color, clip_on=True
-                    )
 
             ax_cat.set_yscale('log')
             ax_cat.set_ylim(y_min, max(category_max * 3.0, y_min * 10))
