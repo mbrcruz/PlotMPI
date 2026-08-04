@@ -529,15 +529,20 @@ class MyPlot(object):
             for i, (bx, v) in enumerate(zip(bar_x, avg_bw)):
                 ax.text(bx, v + std_bw[i] + ax.get_ylim()[1] * 0.01,
                         f'{v:.1f}', ha='center', va='bottom',
-                        fontsize=7.5, fontweight='bold', color=color)
+                        fontsize=16, fontweight='bold', color=color)
 
         ax.set_xticks(X)
-        ax.set_xticklabels([f'{n} nós' for n in all_nodes])
-        ax.set_ylabel('Banda agregada média (Gb/s)')
-        ax.set_xlabel('Configuração')
-        ax.set_ylim(bottom=0)
+        ax.set_xticklabels([f'{n} nós' for n in all_nodes], fontsize=18)
+        ax.set_ylabel('Banda agregada média (Gb/s)', fontsize=20)
+        ax.set_xlabel('Configuração', fontsize=20)
+        max_top = max(v + s for v, s in zip(
+            [df.reindex(all_nodes).fillna(0)['Avg_bandwidth'].values.max() for df, _ in dfs],
+            [df.reindex(all_nodes).fillna(0)['Stddev_bandwidth'].values.max() for df, _ in dfs]
+        ))
+        ax.set_ylim(bottom=0, top=max_top * 1.18)
+        ax.tick_params(axis='y', labelsize=18)
         ax.grid(True, axis='y', linestyle='--', alpha=0.5)
-        ax.legend(fontsize=9, framealpha=0.9)
+        ax.legend(fontsize=16, title_fontsize=16, framealpha=0.9)
         plt.tight_layout()
         plt.show()
 
@@ -676,16 +681,16 @@ class MyPlot(object):
             ax_cat.set_yscale('log')
             ax_cat.set_ylim(y_min, max(category_max * 3.0, y_min * 10))
             ax_cat.grid(True, axis='y', which='both', linestyle='--', alpha=0.35)
-            ax_cat.tick_params(axis='y', labelsize=9)
+            ax_cat.tick_params(axis='y', labelsize=18)
 
             if bi in (0, 2):
-                ax_cat.set_ylabel('Tempo médio de envio (s)', fontsize=10)
+                ax_cat.set_ylabel('Tempo médio de envio (s)', fontsize=20)
 
         for ax_cat in axes:
             if ax_cat.has_data():
                 ax_cat.set_xticks(X)
                 ax_cat.set_xticklabels([f'{node} nós' for node in all_nodes],
-                                       rotation=25, ha='right', fontsize=10)
+                                       rotation=25, ha='right', fontsize=18)
 
 
         cat_h = [Patch(facecolor=c, edgecolor='#555', label=l)
@@ -696,10 +701,10 @@ class MyPlot(object):
 
         fig.legend(handles=cat_h, title='Categoria',
                    loc='upper left', bbox_to_anchor=(0.01, 0.995),
-                   fontsize=9, title_fontsize=9, framealpha=0.92, ncol=2)
+                   fontsize=16, title_fontsize=16, framealpha=0.92, ncol=2)
         fig.legend(handles=exp_h, title='Implementação',
                    loc='upper right', bbox_to_anchor=(0.99, 0.995),
-                   fontsize=9, title_fontsize=9, framealpha=0.92, ncol=min(n_exp, 3))
+                   fontsize=16, title_fontsize=16, framealpha=0.92, ncol=min(n_exp, 3))
 
         plt.tight_layout(rect=[0, 0, 1, 0.92])
         plt.show()
@@ -792,8 +797,9 @@ class MyPlot(object):
         ylim_top = max(global_max, global_errmax) * 1.15
         ax.set_ylim(0, ylim_top)
         ax.set_xticks(X)
-        ax.set_xticklabels([f'{nd} nós' for nd in all_nodes])
-        ax.set_ylabel('Tempo médio de execução (s)')
+        ax.set_xticklabels([f'{nd} nós' for nd in all_nodes], fontsize=18)
+        ax.set_ylabel('Tempo médio de execução (s)', fontsize=20)
+        ax.tick_params(axis='y', labelsize=18)
         ax.grid(True, axis='y', linestyle='--', alpha=0.3)
 
         # ── Legenda ───────────────────────────────────────────────────────────
@@ -803,11 +809,11 @@ class MyPlot(object):
                        hatch=exp_hatches[j % len(exp_hatches)], label=lbl)
                  for j, (_, lbl) in enumerate(experiments)]
         cat_legend = ax.legend(handles=seg_h, title='Categoria',
-                               loc='upper left', fontsize=8, title_fontsize=8,
+                               loc='upper left', fontsize=16, title_fontsize=16,
                                framealpha=0.9, ncol=2)
         ax.add_artist(cat_legend)
         ax.legend(handles=exp_h, title='Implementação',
-                  loc='upper right', fontsize=8, title_fontsize=8,
+                  loc='upper right', fontsize=16, title_fontsize=16,
                   framealpha=0.9)
 
         plt.tight_layout()
