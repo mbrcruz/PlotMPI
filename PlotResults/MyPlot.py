@@ -482,7 +482,7 @@ class MyPlot(object):
         filtered_nodes = [node for node in nodes_filter if node in df.index]
         return df.reindex(filtered_nodes)
             
-    def plotBandwidth(self, experiments, plotLabel, nodes_filter=None, implementation_formats=None):
+    def plotBandwidth(self, experiments, plotLabel, nodes_filter=None, implementation_formats=None, output_path=None):
         """
         Banda agregada por configuração de nós, comparando múltiplos experimentos.
 
@@ -544,6 +544,8 @@ class MyPlot(object):
         ax.grid(True, axis='y', linestyle='--', alpha=0.5)
         ax.legend(fontsize=16, title_fontsize=16, framealpha=0.9)
         plt.tight_layout()
+        if output_path:
+            plt.savefig(output_path, bbox_inches='tight')
         plt.show()
 
     def plotScenarios(self,base_directory,plotLabel):
@@ -574,7 +576,7 @@ class MyPlot(object):
         plt.show()
 
     
-    def plotBlocks(self, experiments, plotLabel, nodes_filter=None, number_blocks=4, implementation_formats=None):
+    def plotBlocks(self, experiments, plotLabel, nodes_filter=None, number_blocks=4, implementation_formats=None, output_path=None):
         """
         Tempo médio por categoria de tamanho de mensagem, comparando experimentos.
 
@@ -707,10 +709,12 @@ class MyPlot(object):
                    fontsize=16, title_fontsize=16, framealpha=0.92, ncol=min(n_exp, 3))
 
         plt.tight_layout(rect=[0, 0, 1, 0.92])
+        if output_path:
+            plt.savefig(output_path, bbox_inches='tight')
         plt.show()
         return
 
-    def plotExecutionTime(self, experiments, plotLabel, nodes_filter=None):
+    def plotExecutionTime(self, experiments, plotLabel, nodes_filter=None, output_path=None):
         """
         Stacked bar com alturas reais (s), barras lado a lado por experimento.
 
@@ -817,6 +821,8 @@ class MyPlot(object):
                   framealpha=0.9)
 
         plt.tight_layout()
+        if output_path:
+            plt.savefig(output_path, bbox_inches='tight')
         plt.show()
 
     # def plotExecutionTimeComparison(self, experiments, plotLabel):
